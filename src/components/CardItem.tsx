@@ -1,0 +1,206 @@
+import { useState } from 'react'
+import { useDraggable } from '@dnd-kit/core'
+import type { Card, Urgencia } from '../types'
+import { viewerUrl } from '../viewer'
+
+const urgColor: Record<Urgencia, string> = {
+  alta: 'text-red bg-red/15',
+  média: 'text-amber bg-amber/15',
+  baixa: 'text-green bg-green/15',
+}
+
+export const CAT_COR: Record<string, string> = {
+  'Conteúdo': 'text-sky-300 bg-sky-500/15',
+  'Anúncio': 'text-amber-300 bg-amber-500/15',
+  'Institucional': 'text-violet-300 bg-violet-500/15',
+  'Captação': 'text-emerald-300 bg-emerald-500/15',
+}
+
+function IconDoc() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h5M9 17h3.5" />
+    </svg>
+  )
+}
+
+/** Visual puro do card. Usado na coluna e no DragOverlay. */
+export function CardView({
+  card,
+  onArchive,
+  onPushSemana,
+  onDelete,
+  onOpen,
+  dragging,
+  overlay,
+  index,
+  dragRef,
+  dragProps,
+}: {
+  card: Card
+  onArchive: (id: string) => void
+  onPushSemana?: (id: string) => void
+  onDelete?: (id: string) => void
+  onOpen?: (card: Card) => void
+  dragging?: boolean
+  overlay?: boolean
+  index?: number
+  dragRef?: (el: HTMLElement | null) => void
+  dragProps?: Record<string, unknown>
+}) {
+  const podeConcluir = card.fase === 'Finalizado' || card.fase === 'No tráfego'
+  const [confirmar, setConfirmar] = useState(false)
+  const base =
+    'group rounded-2xl border bg-surface p-3.5 select-none touch-none cursor-grab active:cursor-grabbing transition-[transform,box-shadow,border-color] duration-200 '
+  const interactive = !dragging && !overlay ? 'hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] active:scale-[0.985] ' : ''
+  const stateCls = overlay
+    ? 'border-brand/50 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.7)] '
+    : dragging
+      ? 'opacity-40 border-border '
+      : 'border-border shadow-[0_2px_8px_-2px_rgba(0,0,0,0.4)] rise '
+
+  return (
+    <div
+      ref={dragRef}
+      {...(dragProps ?? {})}
+      onClick={() => {
+        if (onOpen && !overlay) onOpen(card)
+      }}
+      style={index != null && !overlay ? { animationDelay: `${Math.min(index * 45, 320)}ms` } : undefined}
+      className={base + interactive + stateCls}
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[14.5px] font-bold leading-snug tracking-[-0.01em]">{card.titulo}</div>
+          {card.campanha && <div className="text-[12px] text-muted mt-0.5">{card.campanha}</div>}
+        </div>
+        <span className={'shrink-0 text-[9.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + urgColor[card.urgencia]}>
+          {card.urgencia}
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <span className="text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>
+        {card.categoria && <span className={'text-[10.5px] font-bold rounded-full px-2 py-0.5 ' + (CAT_COR[card.categoria] ?? 'text-muted bg-surface-2')}>{card.categoria}</span>}
+        {card.produto && <span className="text-[10.5px] font-semibold text-ink-2 bg-surface-2 border border-border rounded-full px-2 py-0.5 max-w-[140px] truncate">{card.produto}</span>}
+        {card.prazo && <span className="text-[10.5px] text-muted tnum">⏱ {card.prazo}</span>}
+      </div>
+
+      {card.documentos.length > 0 && (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {card.documentos.map((d, i) => (
+            <a
+              key={i}
+              href={viewerUrl(d.nome, d.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1.5 text-[12px] text-brand-2 bg-surface-2 border border-border rounded-lg px-2 py-1.5 hover:border-brand/50 hover:bg-surface-3 transition-colors"
+            >
+              <IconDoc />
+              <span className="truncate">{d.nome}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      {(onPushSemana || podeConcluir || onDelete) && (
+        <div className="mt-3 flex items-center gap-2">
+          {onPushSemana && !overlay && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onPushSemana(card.id) }}
+              className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-muted hover:text-brand-2 transition-colors"
+              title="Mover para a próxima semana"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M3 9h18M8 2v4M16 2v4M13 15l2 2-2 2" /></svg>
+              Adiar 1 semana
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-1.5">
+            {podeConcluir && (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onArchive(card.id) }}
+                className="inline-flex items-center gap-1.5 text-[12px] font-bold text-green hover:text-[#03210f] hover:bg-green rounded-lg px-3 py-1.5 border border-green/40 transition-colors"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                Concluir
+              </button>
+            )}
+            {onDelete && !overlay && !confirmar && (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setConfirmar(true) }}
+                className="h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-red transition-colors"
+                title="Apagar card"
+                aria-label="Apagar card"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
+              </button>
+            )}
+            {onDelete && !overlay && confirmar && (
+              <span className="inline-flex items-center gap-1 text-[11.5px]">
+                <span className="text-muted">Apagar?</span>
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(card.id)
+                    setConfirmar(false)
+                  }}
+                  className="font-bold text-red px-2 py-1 rounded-lg hover:bg-red hover:text-white transition-colors"
+                  aria-label="Confirmar apagar"
+                >
+                  Sim
+                </button>
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setConfirmar(false) }}
+                  className="font-semibold text-muted px-2 py-1 rounded-lg hover:text-ink transition-colors"
+                >
+                  Não
+                </button>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Card arrastável (na coluna). */
+export default function DraggableCard({
+  card,
+  onArchive,
+  onPushSemana,
+  onDelete,
+  onOpen,
+  index,
+}: {
+  card: Card
+  onArchive: (id: string) => void
+  onPushSemana?: (id: string) => void
+  onDelete?: (id: string) => void
+  onOpen?: (card: Card) => void
+  index?: number
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id })
+  return (
+    <CardView
+      card={card}
+      onArchive={onArchive}
+      onPushSemana={onPushSemana}
+      onDelete={onDelete}
+      onOpen={onOpen}
+      dragging={isDragging}
+      index={index}
+      dragRef={setNodeRef}
+      dragProps={{ ...attributes, ...listeners }}
+    />
+  )
+}
