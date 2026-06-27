@@ -56,7 +56,7 @@ export default function ProdutoPicker({ value, onChange }: { value?: string; onC
                 key={p}
                 type="button"
                 onClick={() => escolher(p)}
-                className={'text-[12.5px] font-bold rounded-lg px-2.5 py-1.5 border transition-all ' + corDoProduto(p) + (value === p ? ' ring-2 ring-white/50' : ' hover:brightness-125')}
+                className={'text-[12.5px] font-bold rounded-lg px-2.5 py-1.5 border transition-all ' + corDoProduto(p) + (value === p ? ' ring-2 ring-inset ring-white/60' : ' hover:brightness-125')}
               >
                 {p}
               </button>
