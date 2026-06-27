@@ -101,6 +101,41 @@ export default function UploadModal({
 
         {!resultado && (
           <>
+            <label
+              className={
+                'flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed py-6 mb-3 cursor-pointer transition-colors ' +
+                (files.length ? 'border-brand/50 bg-brand/5' : 'border-border-strong hover:border-brand/40')
+              }
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-2">
+                <path d="M12 16V4M6 10l6-6 6 6" />
+                <path d="M4 20h16" />
+              </svg>
+              <span className="text-[14px] font-semibold text-ink">
+                {files.length ? files.length + ' documento' + (files.length > 1 ? 's' : '') + ' escolhido' + (files.length > 1 ? 's' : '') : 'Escolher documentos'}
+              </span>
+              <span className="text-[12px] text-muted">.docx · .pdf · .txt — pode vários de uma vez</span>
+              <input
+                type="file"
+                multiple
+                accept=".docx,.pdf,.txt,.md"
+                disabled={rodando}
+                className="hidden"
+                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+              />
+            </label>
+
+            {files.length > 0 && (
+              <div className="flex flex-col gap-1 mb-4 max-h-28 overflow-y-auto">
+                {files.map((f, i) => (
+                  <div key={i} className="text-[12px] text-ink-2 bg-surface-2 border border-border rounded-lg px-2.5 py-1.5 truncate">
+                    {f.name}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-2 mt-1">Ajustes das tarefas</div>
             <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy responsável</label>
             <div className="grid grid-cols-2 gap-2 mb-4">
               {COPYS.map((c) => (
@@ -156,40 +191,6 @@ export default function UploadModal({
               ))}
             </div>
 
-            <label
-              className={
-                'flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed py-6 mb-3 cursor-pointer transition-colors ' +
-                (files.length ? 'border-brand/50 bg-brand/5' : 'border-border-strong hover:border-brand/40')
-              }
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-2">
-                <path d="M12 16V4M6 10l6-6 6 6" />
-                <path d="M4 20h16" />
-              </svg>
-              <span className="text-[14px] font-semibold text-ink">
-                {files.length ? files.length + ' documento' + (files.length > 1 ? 's' : '') + ' escolhido' + (files.length > 1 ? 's' : '') : 'Escolher documentos'}
-              </span>
-              <span className="text-[12px] text-muted">.docx · .pdf · .txt — pode vários de uma vez</span>
-              <input
-                type="file"
-                multiple
-                accept=".docx,.pdf,.txt,.md"
-                disabled={rodando}
-                className="hidden"
-                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-              />
-            </label>
-
-            {files.length > 0 && (
-              <div className="flex flex-col gap-1 mb-4 max-h-28 overflow-y-auto">
-                {files.map((f, i) => (
-                  <div key={i} className="text-[12px] text-ink-2 bg-surface-2 border border-border rounded-lg px-2.5 py-1.5 truncate">
-                    {f.name}
-                  </div>
-                ))}
-              </div>
-            )}
-
             {rodando && (
               <div className="flex items-center gap-2 text-[13px] text-brand-2 mb-4">
                 <span className="h-4 w-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
@@ -197,8 +198,8 @@ export default function UploadModal({
               </div>
             )}
 
-            <div className="flex gap-2.5">
-              <button onClick={onClose} disabled={rodando} className="flex-1 h-12 rounded-xl bg-surface-2 border border-border text-ink font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform">
+            <div className="flex items-center gap-2.5">
+              <button onClick={onClose} disabled={rodando} className="h-12 px-4 rounded-xl text-muted font-semibold hover:text-ink disabled:opacity-40 transition-colors">
                 Cancelar
               </button>
               <button

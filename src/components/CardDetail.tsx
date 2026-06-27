@@ -37,6 +37,16 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [sem, setSem] = useState<string | undefined>(card?.semana)
   const [cp, setCp] = useState<Copy | undefined>(card?.copy)
   const [semR, setSemR] = useState<boolean>(!!card?.semRoteiro)
+  const [salvoMsg, setSalvoMsg] = useState<'' | 'salvo' | 'erro'>('')
+
+  // feedback discreto do auto-save (antes o erro era engolido silenciosamente)
+  const marcarSalvo = () => setSalvoMsg('salvo')
+  const marcarErro = () => setSalvoMsg('erro')
+  useEffect(() => {
+    if (salvoMsg !== 'salvo') return
+    const t = setTimeout(() => setSalvoMsg(''), 1600)
+    return () => clearTimeout(t)
+  }, [salvoMsg])
 
   useEffect(() => {
     setCat(card?.categoria)
@@ -63,40 +73,40 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
 
   function trocarCat(c: Categoria) {
     setCat(c)
-    store.definirCategoria(card!.id, c).catch(() => {})
+    store.definirCategoria(card!.id, c).then(marcarSalvo, marcarErro)
   }
   function trocarProd(p: string) {
     setProd(p)
-    store.definirProduto(card!.id, p).catch(() => {})
+    store.definirProduto(card!.id, p).then(marcarSalvo, marcarErro)
   }
   function trocarSemana(nova: string | null) {
     setSem(nova ?? undefined)
-    store.moverSemana(card!.id, nova).catch(() => {})
+    store.moverSemana(card!.id, nova).then(marcarSalvo, marcarErro)
   }
   function trocarCopy(c: Copy) {
     setCp(c)
-    store.definirCopy(card!.id, c).catch(() => {})
+    store.definirCopy(card!.id, c).then(marcarSalvo, marcarErro)
   }
   function trocarSemRoteiro() {
     const novo = !semR
     setSemR(novo)
-    store.definirSemRoteiro(card!.id, novo).catch(() => {})
+    store.definirSemRoteiro(card!.id, novo).then(marcarSalvo, marcarErro)
   }
   function retirar(drive_id: string) {
     setLinked((ls) => ls.filter((b) => b.drive_id !== drive_id))
     if (playing === drive_id) setPlaying(null)
-    ligarBruto(drive_id, null).catch(() => {})
+    ligarBruto(drive_id, null).then(marcarSalvo, marcarErro)
   }
   function salvarTitulo() {
     const novo = titTmp.trim()
     if (novo && novo !== tit) {
       setTit(novo)
-      store.definirTitulo(card!.id, novo).catch(() => {})
+      store.definirTitulo(card!.id, novo).then(marcarSalvo, marcarErro)
     }
     setEditTit(false)
   }
   function salvarComentario() {
-    store.definirComentario(card!.id, coment).catch(() => {})
+    store.definirComentario(card!.id, coment).then(marcarSalvo, marcarErro)
   }
   function mudarComentTomada(drive_id: string, txt: string) {
     setLinked((ls) => ls.map((b) => (b.drive_id === drive_id ? { ...b, comentario: txt } : b)))
@@ -134,6 +144,13 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               </span>
             </div>
           </div>
+          {salvoMsg && (
+            <span className={'shrink-0 self-center inline-flex items-center gap-1 text-[12px] font-semibold transition-opacity ' + (salvoMsg === 'salvo' ? 'text-green' : 'text-red')}>
+              {salvoMsg === 'salvo' ? (
+                <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>salvo</>
+              ) : 'erro ao salvar'}
+            </span>
+          )}
           <button onClick={onClose} aria-label="Fechar" className="shrink-0 h-9 w-9 grid place-items-center rounded-xl bg-surface-2 border border-border text-muted hover:text-ink transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -255,7 +272,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                       <input
                         value={b.comentario || ''}
                         onChange={(e) => mudarComentTomada(b.drive_id, e.target.value)}
-                        onBlur={(e) => comentarBruto(b.drive_id, e.target.value).catch(() => {})}
+                        onBlur={(e) => comentarBruto(b.drive_id, e.target.value).then(marcarSalvo, marcarErro)}
                         placeholder="Comentário da tomada…"
                         className="w-full mt-2 h-8 px-2.5 rounded-lg bg-surface-2 border border-border text-[12px] text-ink-2 outline-none focus:border-brand/50 placeholder:text-muted"
                       />
