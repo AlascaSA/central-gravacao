@@ -24,6 +24,9 @@ export default function App() {
   const [vistaSem, setVistaSem] = useState<VistaSemana>('semana')
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const sigRef = useRef('')
+  // exclusões com "Desfazer": some da tela na hora, efetiva no banco depois de 5s
+  const [pendingDel, setPendingDel] = useState<{ id: string; titulo: string }[]>([])
+  const delTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   function recarregar() {
     store.listCards().then((cs) => {
@@ -69,7 +72,7 @@ export default function App() {
     }
   }, [])
 
-  const ativos = useMemo(() => cards.filter((c) => !c.arquivado), [cards])
+  const ativos = useMemo(() => cards.filter((c) => !c.arquivado && !pendingDel.some((p) => p.id === c.id)), [cards, pendingDel])
   const arquivados = useMemo(() => cards.filter((c) => c.arquivado), [cards])
 
   // filtra pela semana selecionada
@@ -138,14 +141,25 @@ export default function App() {
     }
   }
 
-  async function handleDelete(id: string) {
-    const antes = cards
-    setCards((cs) => cs.filter((c) => c.id !== id))
-    try {
-      await store.deletarCard(id)
-    } catch {
-      setCards(antes)
-    }
+  function handleDelete(id: string) {
+    const card = cards.find((c) => c.id === id)
+    if (!card) return
+    setPendingDel((p) => [...p.filter((x) => x.id !== id), { id, titulo: card.titulo || 'Card' }])
+    const t = setTimeout(() => commitDelete(id), 5000)
+    delTimers.current.set(id, t)
+  }
+  function commitDelete(id: string) {
+    const t = delTimers.current.get(id)
+    if (t) clearTimeout(t)
+    delTimers.current.delete(id)
+    setPendingDel((p) => p.filter((x) => x.id !== id))
+    store.deletarCard(id).catch(() => {})
+  }
+  function desfazerDelete(id: string) {
+    const t = delTimers.current.get(id)
+    if (t) clearTimeout(t)
+    delTimers.current.delete(id)
+    setPendingDel((p) => p.filter((x) => x.id !== id))
   }
 
   function abrirNovo(copy?: Copy) {
@@ -201,6 +215,13 @@ export default function App() {
               + Novo
             </button>
           </div>
+        </div>
+      )}
+
+      {pendingDel.length > 0 && (
+        <div role="status" className="fixed bottom-[calc(env(safe-area-inset-bottom)+84px)] sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 rounded-xl bg-elev border border-border-strong pl-4 pr-2 py-2 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.7)]">
+          <span className="text-[13px] text-ink-2 truncate max-w-[210px]">“{pendingDel[pendingDel.length - 1].titulo}” apagado</span>
+          <button onClick={() => desfazerDelete(pendingDel[pendingDel.length - 1].id)} className="text-[13px] font-bold text-brand-2 hover:text-brand rounded-lg px-2 py-1 hover:bg-surface-2 transition-colors">Desfazer</button>
         </div>
       )}
 
