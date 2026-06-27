@@ -41,15 +41,12 @@ function mesDiaDe(criado?: string | null): { mes: string; dia: string; mesOrd: n
 
 function FolderCard({ label, sub, onClick }: { label: string; sub: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="group w-full flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left hover:border-border-strong transition-colors">
-      <span className="shrink-0 grid place-items-center h-9 w-9 rounded-lg bg-surface-2 border border-border text-brand-2/80 group-hover:text-brand-2 transition-colors">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" /></svg>
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[14px] font-bold truncate">{label}</span>
-        <span className="block text-[12px] text-muted">{sub}</span>
-      </span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted"><path d="M9 18l6-6-6-6" /></svg>
+    <button onClick={onClick} className="group text-left rounded-2xl border border-border bg-surface p-3 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition-all">
+      <div className="aspect-video rounded-xl bg-surface-2 border border-border grid place-items-center mb-2 text-brand-2/80 group-hover:text-brand-2 transition-colors">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" /></svg>
+      </div>
+      <div className="text-[14px] font-bold truncate">{label}</div>
+      <div className="text-[12px] text-muted mt-0.5">{sub}</div>
     </button>
   )
 }
@@ -149,9 +146,7 @@ export default function Catalogo() {
     return [...meses.values()].sort((a, b) => b.mesOrd - a.mesOrd)
   }, [brutos])
 
-  // colapsa o nível único (estilo Finder): com só um mês, entra direto nos dias dele
-  const mesAtual = nav.mes ? arvore.find((m) => m.mes === nav.mes) || null : arvore.length === 1 ? arvore[0] : null
-  const mostrarMeses = !nav.mes && arvore.length > 1
+  const mesAtual = nav.mes ? arvore.find((m) => m.mes === nav.mes) || null : null
   const diaAtual = mesAtual && nav.dia ? mesAtual.dias.get(nav.dia) || null : null
 
   // filtros do catálogo (quando algum está ativo, mostra grade plana de tudo que casa)
@@ -373,13 +368,13 @@ export default function Catalogo() {
           ) : (
             <>
               <div className="flex items-center gap-1 text-[13px] mb-3 flex-wrap text-muted">
-                <button onClick={() => irPara(null, null)} className={mesAtual || nav.dia ? 'hover:text-ink' : 'text-ink font-bold'}>Catálogo</button>
-                {mesAtual && <><Chevron /><button onClick={() => irPara(mesAtual.mes, null)} className={nav.dia ? 'hover:text-ink' : 'text-ink font-bold'}>{mesAtual.mes}</button></>}
+                <button onClick={() => irPara(null, null)} className={nav.mes ? 'hover:text-ink' : 'text-ink font-bold'}>Catálogo</button>
+                {nav.mes && <><Chevron /><button onClick={() => irPara(nav.mes, null)} className={nav.dia ? 'hover:text-ink' : 'text-ink font-bold'}>{nav.mes}</button></>}
                 {nav.dia && <><Chevron /><span className="text-ink font-bold">Dia {nav.dia}</span></>}
               </div>
 
-              {mostrarMeses && (
-                <div className="flex flex-col gap-2">
+              {!nav.mes && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {arvore.map((m) => {
                     const tot = [...m.dias.values()].reduce((s, d) => s + d.videos.length, 0)
                     return <FolderCard key={m.mes} label={m.mes} sub={tot + ' vídeo' + (tot > 1 ? 's' : '')} onClick={() => irPara(m.mes, null)} />
@@ -387,10 +382,10 @@ export default function Catalogo() {
                 </div>
               )}
 
-              {!nav.dia && mesAtual && (
-                <div className="flex flex-col gap-2">
+              {nav.mes && !nav.dia && mesAtual && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {[...mesAtual.dias.values()].sort((a, b) => b.diaOrd - a.diaOrd).map((d) => (
-                    <FolderCard key={d.dia} label={'Dia ' + d.dia} sub={d.videos.length + ' vídeo' + (d.videos.length > 1 ? 's' : '')} onClick={() => irPara(mesAtual.mes, d.dia)} />
+                    <FolderCard key={d.dia} label={'Dia ' + d.dia} sub={d.videos.length + ' vídeo' + (d.videos.length > 1 ? 's' : '')} onClick={() => irPara(nav.mes, d.dia)} />
                   ))}
                 </div>
               )}

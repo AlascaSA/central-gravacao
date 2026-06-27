@@ -68,6 +68,11 @@ export default function NewCardModal({
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong" />
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-5">Novo card</h3>
 
+        <label className="block text-[12px] font-semibold text-muted mb-1.5">Título do vídeo <span className="text-brand-2">*</span></label>
+        <input className={inputCls + ' mb-1.5'} value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Dívida de ITBI" autoFocus />
+        {!titulo.trim() && <p className="text-[12px] text-muted mb-4">Dê um nome ao vídeo pra poder criar.</p>}
+        {titulo.trim() && <div className="mb-4" />}
+
         <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy</label>
         <div className="grid grid-cols-2 gap-2 mb-3">
           {COPYS.map((c) => (
@@ -96,13 +101,10 @@ export default function NewCardModal({
         </div>
 
         <label className="block text-[12px] font-semibold text-muted mb-1.5">Produto</label>
-        <div className="mb-4"><ProdutoPicker value={produto || undefined} onChange={setProduto} /></div>
+        <div className="mb-6"><ProdutoPicker value={produto || undefined} onChange={setProduto} /></div>
 
-        <label className="block text-[12px] font-semibold text-muted mb-1.5">Título do vídeo</label>
-        <input className={inputCls + ' mb-6'} value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Dívida de ITBI" autoFocus />
-
-        <div className="flex gap-2.5">
-          <button onClick={onClose} className="flex-1 h-12 rounded-xl bg-surface-2 border border-border text-ink font-semibold active:scale-[0.98] transition-transform">
+        <div className="flex items-center gap-2.5">
+          <button onClick={onClose} className="h-12 px-4 rounded-xl text-muted font-semibold hover:text-ink transition-colors">
             Cancelar
           </button>
           <button
