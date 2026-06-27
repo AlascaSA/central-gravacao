@@ -9,11 +9,11 @@ export default function NewCardModal({
   onCreate,
 }: {
   open: boolean
-  copyDefault: Copy
+  copyDefault?: Copy
   onClose: () => void
   onCreate: (novo: NovoCard) => Promise<void> | void
 }) {
-  const [copy, setCopy] = useState<Copy>(copyDefault)
+  const [copy, setCopy] = useState<Copy | undefined>(copyDefault)
   const [semRoteiro, setSemRoteiro] = useState(false)
   const [titulo, setTitulo] = useState('')
   const [categoria, setCategoria] = useState<Categoria>('Conteúdo')
@@ -73,10 +73,10 @@ export default function NewCardModal({
         {!titulo.trim() && <p className="text-[12px] text-muted mb-4">Dê um nome ao vídeo pra poder criar.</p>}
         {titulo.trim() && <div className="mb-4" />}
 
-        <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy</label>
+        <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy <span className="font-normal text-muted/70">(opcional)</span></label>
         <div className="grid grid-cols-2 gap-2 mb-3">
           {COPYS.map((c) => (
-            <button key={c} onClick={() => setCopy(c)} className={pill(copy === c)}>
+            <button key={c} onClick={() => setCopy(copy === c ? undefined : c)} className={pill(copy === c)}>
               {c}
             </button>
           ))}

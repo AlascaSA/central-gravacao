@@ -18,7 +18,7 @@ export default function App() {
   const [filtro, setFiltro] = useState<FiltroCopy>('Todas')
   const [vista, setVista] = useState<Vista>('quadro')
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalCopy, setModalCopy] = useState<Copy>('Andressa')
+  const [modalCopy, setModalCopy] = useState<Copy | undefined>(undefined)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [semMonday, setSemMonday] = useState(currentMonday())
   const [vistaSem, setVistaSem] = useState<VistaSemana>('semana')
@@ -148,7 +148,7 @@ export default function App() {
     }
   }
 
-  function abrirNovo(copy: Copy) {
+  function abrirNovo(copy?: Copy) {
     setModalCopy(copy)
     setModalOpen(true)
   }
@@ -166,7 +166,7 @@ export default function App() {
           onChangeFiltro={setFiltro}
           counts={counts}
           onSubir={() => setUploadOpen(true)}
-          onNovo={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? 'Andressa' : filtro)}
+          onNovo={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? undefined : filtro)}
         />
       )}
 
@@ -195,7 +195,7 @@ export default function App() {
               Subir roteiros
             </button>
             <button
-              onClick={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? 'Andressa' : filtro)}
+              onClick={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? undefined : filtro)}
               className="flex-1 h-[52px] rounded-2xl bg-surface-2 border border-border text-ink font-semibold text-[13px] active:scale-[0.98] hover:border-border-strong transition-all"
             >
               + Novo
