@@ -41,14 +41,21 @@ function mesDiaDe(criado?: string | null): { mes: string; dia: string; mesOrd: n
 
 function FolderCard({ label, sub, onClick }: { label: string; sub: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="group text-left rounded-2xl border border-border bg-surface p-3 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition-all">
-      <div className="aspect-video rounded-xl bg-surface-2 border border-border grid place-items-center mb-2 text-brand-2/70 group-hover:text-brand-2 transition-colors">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" /></svg>
-      </div>
-      <div className="text-[13px] font-bold truncate">{label}</div>
-      <div className="text-[12px] text-muted mt-0.5">{sub}</div>
+    <button onClick={onClick} className="group w-full flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 text-left hover:border-border-strong transition-colors">
+      <span className="shrink-0 grid place-items-center h-9 w-9 rounded-lg bg-surface-2 border border-border text-brand-2/80 group-hover:text-brand-2 transition-colors">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" /></svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] font-bold truncate">{label}</span>
+        <span className="block text-[12px] text-muted">{sub}</span>
+      </span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted"><path d="M9 18l6-6-6-6" /></svg>
     </button>
   )
+}
+
+function Chevron() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted"><path d="M9 18l6-6-6-6" /></svg>
 }
 
 export default function Catalogo() {
@@ -142,7 +149,9 @@ export default function Catalogo() {
     return [...meses.values()].sort((a, b) => b.mesOrd - a.mesOrd)
   }, [brutos])
 
-  const mesAtual = nav.mes ? arvore.find((m) => m.mes === nav.mes) || null : null
+  // colapsa o nível único (estilo Finder): com só um mês, entra direto nos dias dele
+  const mesAtual = nav.mes ? arvore.find((m) => m.mes === nav.mes) || null : arvore.length === 1 ? arvore[0] : null
+  const mostrarMeses = !nav.mes && arvore.length > 1
   const diaAtual = mesAtual && nav.dia ? mesAtual.dias.get(nav.dia) || null : null
 
   // filtros do catálogo (quando algum está ativo, mostra grade plana de tudo que casa)
@@ -150,6 +159,7 @@ export default function Catalogo() {
   const [fProduto, setFProduto] = useState('')
   const [fSemana, setFSemana] = useState('')
   const filtrando = fTipo !== 'todas' || !!fProduto || !!fSemana
+  const limparFiltros = () => { setFTipo('todas'); setFProduto(''); setFSemana('') }
   const produtoDoBruto = (b: Bruto) => { const cid = classif[b.id]?.card_id; return cid ? cards.find((c) => c.id === cid)?.produto : undefined }
   const semanaDoBruto = (b: Bruto) => (b.criado ? semanaDeGravacao(new Date(b.criado)) : '')
   const filtrados = useMemo(() => {
@@ -331,7 +341,8 @@ export default function Catalogo() {
         <>
           {/* filtros */}
           <div className="flex items-center gap-1.5 flex-wrap mb-3">
-            <button onClick={() => setFTipo('todas')} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === 'todas' ? 'bg-brand/15 border-brand/50 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>Todas</button>
+            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mr-0.5">Filtrar</span>
+            <button onClick={() => setFTipo('todas')} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === 'todas' ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>Todas</button>
             {TIPOS.map((v) => (
               <button key={v} onClick={() => setFTipo(v)} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === v ? TIPO_META[v].badge : 'bg-surface-2 border-border text-muted hover:text-ink')}>{TIPO_META[v].label}</button>
             ))}
@@ -344,24 +355,31 @@ export default function Catalogo() {
               <option value="">Semana: todas</option>
               {semanasFiltro.map((s) => <option key={s} value={s}>{'Semana ' + s.slice(8, 10) + '/' + s.slice(5, 7)}</option>)}
             </select>
-            {filtrando && <button onClick={() => { setFTipo('todas'); setFProduto(''); setFSemana('') }} className="text-[12px] font-medium text-muted hover:text-rose-300 ml-0.5">limpar</button>}
+            {filtrando && <button onClick={limparFiltros} className="text-[12px] font-medium text-muted hover:text-rose-300 ml-0.5">limpar</button>}
           </div>
 
           {filtrando ? (
-            <>
-              <div className="text-[12px] text-muted mb-2 tnum">{filtrados.length} vídeo{filtrados.length === 1 ? '' : 's'}</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{videosVisiveis.map(cardEl)}</div>
-            </>
+            filtrados.length === 0 ? (
+              <div className="text-center text-muted py-16">
+                Nenhum vídeo com esses filtros.
+                <button onClick={limparFiltros} className="block mx-auto mt-2 text-[13px] font-semibold text-brand-2 hover:text-brand">limpar filtros</button>
+              </div>
+            ) : (
+              <>
+                <div className="text-[12px] text-muted mb-2 tnum">{filtrados.length} vídeo{filtrados.length === 1 ? '' : 's'}</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{videosVisiveis.map(cardEl)}</div>
+              </>
+            )
           ) : (
             <>
-              <div className="flex items-center gap-1.5 text-[13px] mb-3 flex-wrap">
-                <button onClick={() => irPara(null, null)} className={nav.mes ? 'text-muted hover:text-ink' : 'text-ink font-bold'}>Tudo</button>
-                {nav.mes && <><span className="text-muted">›</span><button onClick={() => irPara(nav.mes, null)} className={nav.dia ? 'text-muted hover:text-ink' : 'text-ink font-bold'}>{nav.mes}</button></>}
-                {nav.dia && <><span className="text-muted">›</span><span className="text-ink font-bold">Dia {nav.dia}</span></>}
+              <div className="flex items-center gap-1 text-[13px] mb-3 flex-wrap text-muted">
+                <button onClick={() => irPara(null, null)} className={mesAtual || nav.dia ? 'hover:text-ink' : 'text-ink font-bold'}>Catálogo</button>
+                {mesAtual && <><Chevron /><button onClick={() => irPara(mesAtual.mes, null)} className={nav.dia ? 'hover:text-ink' : 'text-ink font-bold'}>{mesAtual.mes}</button></>}
+                {nav.dia && <><Chevron /><span className="text-ink font-bold">Dia {nav.dia}</span></>}
               </div>
 
-              {!nav.mes && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {mostrarMeses && (
+                <div className="flex flex-col gap-2">
                   {arvore.map((m) => {
                     const tot = [...m.dias.values()].reduce((s, d) => s + d.videos.length, 0)
                     return <FolderCard key={m.mes} label={m.mes} sub={tot + ' vídeo' + (tot > 1 ? 's' : '')} onClick={() => irPara(m.mes, null)} />
@@ -369,10 +387,10 @@ export default function Catalogo() {
                 </div>
               )}
 
-              {nav.mes && !nav.dia && mesAtual && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {!nav.dia && mesAtual && (
+                <div className="flex flex-col gap-2">
                   {[...mesAtual.dias.values()].sort((a, b) => b.diaOrd - a.diaOrd).map((d) => (
-                    <FolderCard key={d.dia} label={'Dia ' + d.dia} sub={d.videos.length + ' vídeo' + (d.videos.length > 1 ? 's' : '')} onClick={() => irPara(nav.mes, d.dia)} />
+                    <FolderCard key={d.dia} label={'Dia ' + d.dia} sub={d.videos.length + ' vídeo' + (d.videos.length > 1 ? 's' : '')} onClick={() => irPara(mesAtual.mes, d.dia)} />
                   ))}
                 </div>
               )}
@@ -408,8 +426,8 @@ export default function Catalogo() {
           <div className="sheet-up relative w-full max-w-2xl h-[86vh] flex flex-col bg-elev border border-border-strong rounded-2xl p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex items-center gap-2 mb-3 shrink-0">
               <div className="flex items-center gap-1 shrink-0">
-                <button disabled={!temPrev} onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className={navBtn}>‹</button>
-                <button disabled={!temNext} onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className={navBtn}>›</button>
+                <button disabled={!temPrev} onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className={navBtn}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
+                <button disabled={!temNext} onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className={navBtn}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
               </div>
               <div className="min-w-0 flex-1">
                 {editNome ? (
@@ -489,10 +507,10 @@ export default function Catalogo() {
                 </div>
               )}
               {fonte !== 'checando' && temPrev && (
-                <button onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none">‹</button>
+                <button onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
               )}
               {fonte !== 'checando' && temNext && (
-                <button onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none">›</button>
+                <button onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
               )}
             </div>
             {fonte === 'raw' && (
