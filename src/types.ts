@@ -1,7 +1,9 @@
 export const FASES = ['A gravar', 'A editar', 'Em edição', 'Finalizado', 'No tráfego', 'para Jaylton gravar'] as const
 export type Fase = (typeof FASES)[number]
 
-export const COPYS = ['Andressa', 'Sofia', 'Thayná', 'Sem roteiro'] as const
+// Copywriters. "Sem roteiro" NÃO é copy — virou um marcador à parte (campo semRoteiro),
+// pra um vídeo poder ser sem roteiro E de uma copy ao mesmo tempo.
+export const COPYS = ['Andressa', 'Sofia', 'Thayná'] as const
 export type Copy = (typeof COPYS)[number]
 
 export const URGENCIAS = ['alta', 'média', 'baixa'] as const
@@ -18,7 +20,10 @@ export interface Doc {
 
 export interface Card {
   id: string
-  copy: Copy
+  /** Copywriter responsável. Opcional: um vídeo sem roteiro pode ainda não ter copy. */
+  copy?: Copy
+  /** Gravado sem roteiro escrito. Independente da copy. */
+  semRoteiro?: boolean
   fase: Fase
   /** Segunda-feira da semana alvo, 'YYYY-MM-DD'. Vazio = sem semana. */
   semana?: string
@@ -40,7 +45,8 @@ export interface Card {
 }
 
 export interface NovoCard {
-  copy: Copy
+  copy?: Copy
+  semRoteiro?: boolean
   titulo: string
   campanha?: string
   categoria?: Categoria

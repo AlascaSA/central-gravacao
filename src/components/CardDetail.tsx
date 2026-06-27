@@ -36,6 +36,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [coment, setComent] = useState(card?.comentario || '')
   const [sem, setSem] = useState<string | undefined>(card?.semana)
   const [cp, setCp] = useState<Copy | undefined>(card?.copy)
+  const [semR, setSemR] = useState<boolean>(!!card?.semRoteiro)
 
   useEffect(() => {
     setCat(card?.categoria)
@@ -45,6 +46,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     setComent(card?.comentario || '')
     setSem(card?.semana)
     setCp(card?.copy)
+    setSemR(!!card?.semRoteiro)
     setPlaying(null)
     if (card) listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
     else setLinked([])
@@ -67,6 +69,11 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   function trocarCopy(c: Copy) {
     setCp(c)
     store.definirCopy(card!.id, c).catch(() => {})
+  }
+  function trocarSemRoteiro() {
+    const novo = !semR
+    setSemR(novo)
+    store.definirSemRoteiro(card!.id, novo).catch(() => {})
   }
   function retirar(drive_id: string) {
     setLinked((ls) => ls.filter((b) => b.drive_id !== drive_id))
@@ -112,7 +119,8 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               </button>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cp}</span>
+              {cp && <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cp}</span>}
+              {semR && <span className="text-[11px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
               {card.campanha && <span className="text-[12px] text-muted">{card.campanha}</span>}
               <span className={'text-[9.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + (urgColor[card.urgencia] ?? 'text-muted bg-surface-2')}>
                 {card.urgencia}
@@ -126,9 +134,9 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
 
         {/* corpo rolável */}
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-          {/* copy (responsável) */}
+          {/* copy (responsável) + marcador sem roteiro */}
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Copy</div>
-          <div className="flex flex-wrap gap-1.5 mb-4">
+          <div className="flex flex-wrap items-center gap-1.5 mb-4">
             {COPYS.map((c) => (
               <button
                 key={c}
@@ -138,6 +146,14 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                 {c}
               </button>
             ))}
+            <span className="w-px h-5 bg-border mx-0.5" />
+            <button
+              onClick={trocarSemRoteiro}
+              title="Gravado sem roteiro escrito (independe da copy)"
+              className={'text-[12px] font-semibold rounded-lg border px-2.5 py-1 transition-colors ' + (semR ? 'text-amber bg-amber/12 border-amber/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}
+            >
+              sem roteiro
+            </button>
           </div>
 
           {/* categoria */}

@@ -22,6 +22,8 @@ export interface Store {
   definirCategoria(id: string, categoria: Categoria): Promise<Card>
   /** Define/troca a copy (responsável) da tarefa. */
   definirCopy(id: string, copy: Copy): Promise<Card>
+  /** Marca/desmarca a tarefa como "sem roteiro" (independente da copy). */
+  definirSemRoteiro(id: string, valor: boolean): Promise<Card>
   /** Define/troca o produto da tarefa. */
   definirProduto(id: string, produto: string): Promise<Card>
   /** Lista de produtos salvos (pra escolher no upload). */
@@ -65,7 +67,7 @@ function seed(): Card[] {
     base({ copy: 'Andressa', fase: 'A gravar', titulo: 'Dívida de ITBI', campanha: 'Redes sociais', urgencia: 'alta', documentos: [{ nome: 'Copy - Dívida de ITBI.pdf', url: 'https://example.com/doc1' }] }),
     base({ copy: 'Sofia', fase: 'A gravar', titulo: 'Manifesto PPC', campanha: 'POS PPC', urgencia: 'alta' }),
     base({ copy: 'Thayná', fase: 'A gravar', titulo: 'Neuromarketing', campanha: 'Redes sociais', urgencia: 'média', documentos: [{ nome: 'Roteiro.docx', url: 'https://example.com/doc2' }] }),
-    base({ copy: 'Sem roteiro', fase: 'A editar', titulo: 'Deserdar herdeiro', campanha: 'Redes sociais', urgencia: 'média' }),
+    base({ copy: 'Sofia', semRoteiro: true, fase: 'A editar', titulo: 'Deserdar herdeiro', campanha: 'Redes sociais', urgencia: 'média' }),
     base({ copy: 'Andressa', fase: 'Em edição', titulo: 'VSL do PDI', campanha: 'PDI', urgencia: 'alta' }),
     base({ copy: 'Sofia', fase: 'Finalizado', titulo: 'Reforma tributária e ITCMD', campanha: 'YouTube', urgencia: 'baixa' }),
     base({ copy: 'Thayná', fase: 'No tráfego', titulo: 'Anúncio de captação', campanha: 'Captação', urgencia: 'alta' }),
@@ -84,6 +86,7 @@ export function createMockStore(): Store {
       const card: Card = {
         id: novoId(),
         copy: input.copy,
+        semRoteiro: input.semRoteiro,
         fase: input.fase ?? 'A gravar',
         titulo: input.titulo.trim(),
         campanha: input.campanha ?? '',
@@ -126,6 +129,13 @@ export function createMockStore(): Store {
       const c = cards.find((x) => x.id === id)
       if (!c) throw new Error('Card não encontrado')
       c.copy = copy
+      c.atualizadoEm = agora()
+      return { ...c }
+    },
+    async definirSemRoteiro(id, valor) {
+      const c = cards.find((x) => x.id === id)
+      if (!c) throw new Error('Card não encontrado')
+      c.semRoteiro = valor
       c.atualizadoEm = agora()
       return { ...c }
     },

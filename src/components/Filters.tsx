@@ -1,6 +1,6 @@
 import { COPYS, type Copy } from '../types'
 
-export type FiltroCopy = Copy | 'Todas'
+export type FiltroCopy = Copy | 'Todas' | 'Sem roteiro'
 
 export default function Filters({
   value,
@@ -11,7 +11,7 @@ export default function Filters({
   onChange: (v: FiltroCopy) => void
   counts: Record<string, number>
 }) {
-  const opcoes: FiltroCopy[] = ['Todas', ...COPYS]
+  const opcoes: FiltroCopy[] = ['Todas', ...COPYS, 'Sem roteiro']
   return (
     <div className="relative z-10 flex gap-2 overflow-x-auto px-4 sm:px-6 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {opcoes.map((op) => {

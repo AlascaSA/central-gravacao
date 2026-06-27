@@ -25,7 +25,7 @@ export default function Archive({ cards }: { cards: Card[] }) {
   const [fSemana, setFSemana] = useState('')
 
   const produtos = useMemo(() => [...new Set(cards.map((c) => c.produto).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)), [cards])
-  const copys = useMemo(() => [...new Set(cards.map((c) => c.copy))].sort((a, b) => a.localeCompare(b)), [cards])
+  const copys = useMemo(() => [...new Set(cards.map((c) => c.copy).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)), [cards])
   const semanas = useMemo(() => [...new Set(cards.map((c) => c.semana).filter(Boolean) as string[])].sort().reverse(), [cards])
 
   const q = busca.trim().toLowerCase()
@@ -117,7 +117,8 @@ export default function Archive({ cards }: { cards: Card[] }) {
                       <div className="text-[14px] font-semibold truncate">{c.titulo}</div>
                     </div>
                     <div className="text-[12px] text-muted flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <span>{c.copy}</span>
+                      {c.copy && <span>{c.copy}</span>}
+                      {c.semRoteiro && <span className="text-[10px] font-bold text-amber bg-amber/12 rounded-full px-1.5 py-0.5">sem roteiro</span>}
                       {c.categoria && <span className={'text-[10px] font-bold rounded-full px-1.5 py-0.5 ' + (CAT_COR[c.categoria] ?? 'text-muted bg-surface-2')}>{c.categoria}</span>}
                       {c.produto && <span className={'text-[10px] font-bold border rounded-full px-1.5 py-0.5 ' + corDoProduto(c.produto)}>{c.produto}</span>}
                       {c.campanha && <span>· {c.campanha}</span>}

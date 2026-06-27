@@ -88,7 +88,8 @@ export function CardView({
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        <span className="text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>
+        {card.copy && <span className="text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>}
+        {card.semRoteiro && <span className="text-[10.5px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
         {card.categoria && <span className={'text-[10.5px] font-bold rounded-full px-2 py-0.5 ' + (CAT_COR[card.categoria] ?? 'text-muted bg-surface-2')}>{card.categoria}</span>}
         {card.produto && <span className={'text-[10.5px] font-bold border rounded-full px-2 py-0.5 max-w-[150px] truncate ' + corDoProduto(card.produto)}>{card.produto}</span>}
         {card.prazo && <span className="text-[10.5px] text-muted tnum">⏱ {card.prazo}</span>}

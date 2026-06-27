@@ -14,6 +14,7 @@ export default function NewCardModal({
   onCreate: (novo: NovoCard) => Promise<void> | void
 }) {
   const [copy, setCopy] = useState<Copy>(copyDefault)
+  const [semRoteiro, setSemRoteiro] = useState(false)
   const [titulo, setTitulo] = useState('')
   const [categoria, setCategoria] = useState<Categoria>('Conteúdo')
   const [produto, setProduto] = useState('')
@@ -22,6 +23,7 @@ export default function NewCardModal({
   useEffect(() => {
     if (open) {
       setCopy(copyDefault)
+      setSemRoteiro(false)
       setTitulo('')
       setCategoria('Conteúdo')
       setProduto('')
@@ -38,7 +40,7 @@ export default function NewCardModal({
     if (!titulo.trim() || salvando) return
     setSalvando(true)
     try {
-      await onCreate({ copy, titulo, categoria, produto: produto || undefined })
+      await onCreate({ copy, semRoteiro, titulo, categoria, produto: produto || undefined })
       onClose()
     } finally {
       setSalvando(false)
@@ -60,13 +62,22 @@ export default function NewCardModal({
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-5">Novo card</h3>
 
         <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Copy</label>
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           {COPYS.map((c) => (
             <button key={c} onClick={() => setCopy(c)} className={pill(copy === c)}>
               {c}
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setSemRoteiro((v) => !v)}
+          className={'mb-4 h-10 px-3.5 rounded-xl border text-[13.5px] font-semibold transition-all active:scale-95 inline-flex items-center gap-2 ' + (semRoteiro ? 'text-amber bg-amber/12 border-amber/40' : 'bg-surface border-border text-muted hover:text-ink')}
+        >
+          <span className={'h-4 w-4 rounded grid place-items-center border ' + (semRoteiro ? 'bg-amber border-amber' : 'border-border-strong')}>
+            {semRoteiro && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a1205" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+          </span>
+          Sem roteiro escrito
+        </button>
 
         <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Categoria</label>
         <div className="grid grid-cols-2 gap-2 mb-4">

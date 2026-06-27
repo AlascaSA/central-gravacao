@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
 import { listarClassificacoes, confirmarTipo, ligarBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
 import { store } from '../data/store'
-import { CATEGORIAS, type Card, type Categoria } from '../types'
+import { CATEGORIAS, COPYS, type Card, type Categoria, type Copy } from '../types'
 import { semanaDeGravacao } from '../week'
 
 // proxy leve (1080p + áudio AAC, faststart) no Supabase Storage; quando existe, toca com som
@@ -62,6 +62,7 @@ export default function Catalogo() {
   const [buscaCard, setBuscaCard] = useState('')
   const [novaTarefa, setNovaTarefa] = useState('')
   const [novaCat, setNovaCat] = useState<Categoria>('Conteúdo')
+  const [novaCopy, setNovaCopy] = useState<Copy | undefined>(undefined)
   const [ligando, setLigando] = useState(false)
   const [nav, setNav] = useState<{ mes: string | null; dia: string | null }>({ mes: null, dia: null })
   function irPara(mes: string | null, dia: string | null) { setNav({ mes, dia }); setIdx(null) }
@@ -105,10 +106,11 @@ export default function Catalogo() {
     try {
       // a tarefa "Sem roteiro" cai na semana de produção do vídeo (Seg–Qua = semana da data; Qui–Dom = próxima)
       const semana = aberto?.criado ? semanaDeGravacao(new Date(aberto.criado)) : undefined
-      const card = await store.createCard({ copy: 'Sem roteiro', titulo: t, categoria: novaCat, fase: 'A editar', semana })
+      const card = await store.createCard({ semRoteiro: true, copy: novaCopy, titulo: t, categoria: novaCat, fase: 'A editar', semana })
       setCards((cs) => [card, ...cs])
       await ligar(card.id)
       setNovaTarefa('')
+      setNovaCopy(undefined)
     } finally {
       setLigando(false)
     }
@@ -547,7 +549,8 @@ export default function Catalogo() {
                       if (cardLig) {
                         return (
                           <div className="flex items-center gap-2">
-                            <span className="shrink-0 text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cardLig.copy}</span>
+                            {cardLig.copy && <span className="shrink-0 text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cardLig.copy}</span>}
+                            {cardLig.semRoteiro && <span className="shrink-0 text-[10.5px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
                             <span className="text-[13px] font-semibold truncate flex-1">{cardLig.titulo}</span>
                             <button onClick={desligar} className="shrink-0 text-[11px] text-muted hover:text-rose-300">Desligar</button>
                           </div>
@@ -556,14 +559,14 @@ export default function Catalogo() {
                       if (!linkOpen) {
                         return <button onClick={() => setLinkOpen(true)} className="text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">+ Ligar a uma tarefa</button>
                       }
-                      const filtradas = cards.filter((c) => !c.arquivado && (c.titulo + ' ' + c.copy + ' ' + (c.campanha || '')).toLowerCase().includes(buscaCard.toLowerCase())).slice(0, 8)
+                      const filtradas = cards.filter((c) => !c.arquivado && (c.titulo + ' ' + (c.copy || '') + ' ' + (c.campanha || '')).toLowerCase().includes(buscaCard.toLowerCase())).slice(0, 8)
                       return (
                         <div className="flex flex-col gap-2">
                           <input value={buscaCard} onChange={(e) => setBuscaCard(e.target.value)} placeholder="Buscar tarefa existente…" autoFocus className="h-9 px-3 rounded-lg bg-surface border border-border text-[13px] text-ink outline-none focus:border-brand/60" />
                           <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                             {filtradas.map((c) => (
                               <button key={c.id} disabled={ligando} onClick={() => ligar(c.id)} className="text-left flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-2 transition-colors disabled:opacity-50">
-                                <span className="shrink-0 text-[10px] font-bold text-brand-2 bg-brand/12 rounded-full px-1.5 py-0.5">{c.copy}</span>
+                                <span className="shrink-0 text-[10px] font-bold text-brand-2 bg-brand/12 rounded-full px-1.5 py-0.5">{c.copy ?? (c.semRoteiro ? 'sem rot.' : '—')}</span>
                                 <span className="text-[12.5px] truncate">{c.titulo}</span>
                               </button>
                             ))}
@@ -575,6 +578,12 @@ export default function Catalogo() {
                             <div className="flex flex-wrap gap-1.5 mb-2">
                               {CATEGORIAS.map((cat) => (
                                 <button key={cat} onClick={() => setNovaCat(cat)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCat === cat ? 'bg-brand border-brand text-white' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{cat}</button>
+                              ))}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-muted mr-0.5">Copy</span>
+                              {COPYS.map((c) => (
+                                <button key={c} onClick={() => setNovaCopy(novaCopy === c ? undefined : c)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCopy === c ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{c}</button>
                               ))}
                             </div>
                             <div className="flex items-center gap-2">

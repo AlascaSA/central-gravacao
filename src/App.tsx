@@ -81,12 +81,20 @@ export default function App() {
 
   const counts = useMemo(() => {
     const r: Record<string, number> = { __total: daSemana.length }
-    for (const c of daSemana) r[c.copy] = (r[c.copy] ?? 0) + 1
+    for (const c of daSemana) {
+      if (c.copy) r[c.copy] = (r[c.copy] ?? 0) + 1
+      if (c.semRoteiro) r['Sem roteiro'] = (r['Sem roteiro'] ?? 0) + 1
+    }
     return r
   }, [daSemana])
 
   const ativosFiltrados = useMemo(
-    () => (filtro === 'Todas' ? daSemana : daSemana.filter((c) => c.copy === filtro)),
+    () =>
+      filtro === 'Todas'
+        ? daSemana
+        : filtro === 'Sem roteiro'
+          ? daSemana.filter((c) => c.semRoteiro)
+          : daSemana.filter((c) => c.copy === filtro),
     [daSemana, filtro],
   )
 

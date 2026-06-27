@@ -5,7 +5,8 @@ import type { Store } from './store'
 // Linha do Postgres (snake_case) -> Card (camelCase)
 interface Row {
   id: string
-  copy: string
+  copy: string | null
+  sem_roteiro: boolean | null
   fase: string
   semana: string | null
   titulo: string
@@ -28,7 +29,8 @@ interface Row {
 function toCard(r: Row): Card {
   return {
     id: r.id,
-    copy: r.copy as Copy,
+    copy: (r.copy as Copy) ?? undefined,
+    semRoteiro: !!r.sem_roteiro,
     fase: r.fase as Fase,
     semana: r.semana ?? undefined,
     titulo: r.titulo,
@@ -63,7 +65,8 @@ export function createSupabaseStore(): Store {
       const { data, error } = await sb
         .from('cards')
         .insert({
-          copy: input.copy,
+          copy: input.copy ?? null,
+          sem_roteiro: input.semRoteiro ?? false,
           titulo: input.titulo.trim(),
           campanha: input.campanha ?? '',
           categoria: input.categoria ?? null,
@@ -160,6 +163,17 @@ export function createSupabaseStore(): Store {
       const { data, error } = await sb
         .from('cards')
         .update({ copy, atualizado_em: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      return toCard(data as Row)
+    },
+
+    async definirSemRoteiro(id, valor) {
+      const { data, error } = await sb
+        .from('cards')
+        .update({ sem_roteiro: valor, atualizado_em: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single()
