@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { store } from './data/store'
 import type { Card, Copy, Fase, NovoCard } from './types'
 import Header, { type Vista } from './components/Header'
-import Filters, { type FiltroCopy } from './components/Filters'
+import QuadroToolbar, { type FiltroCopy, type VistaSemana } from './components/QuadroToolbar'
 import Board from './components/Board'
 import Archive from './components/Archive'
 import Catalogo from './components/Catalogo'
@@ -10,7 +10,6 @@ import Links from './components/Links'
 import NewCardModal from './components/NewCardModal'
 import UploadModal from './components/UploadModal'
 import CardDetail from './components/CardDetail'
-import WeekNav, { type VistaSemana } from './components/WeekNav'
 import { addWeeks, currentMonday, nextMonday } from './week'
 
 export default function App() {
@@ -159,10 +158,17 @@ export default function App() {
       <Header vista={vista} onVista={setVista} />
 
       {vista === 'quadro' && (
-        <WeekNav monday={semMonday} vista={vistaSem} onChange={(m, v) => { setSemMonday(m); setVistaSem(v) }} />
+        <QuadroToolbar
+          monday={semMonday}
+          vistaSem={vistaSem}
+          onChangeSemana={(m, v) => { setSemMonday(m); setVistaSem(v) }}
+          filtro={filtro}
+          onChangeFiltro={setFiltro}
+          counts={counts}
+          onSubir={() => setUploadOpen(true)}
+          onNovo={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? 'Andressa' : filtro)}
+        />
       )}
-
-      {vista === 'quadro' && <Filters value={filtro} onChange={setFiltro} counts={counts} />}
 
       {carregando ? (
         <div className="relative z-10 grid place-items-center py-24">
@@ -179,7 +185,7 @@ export default function App() {
       )}
 
       {vista === 'quadro' && (
-        <div className="glass fixed bottom-0 left-0 right-0 z-30 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border/70">
+        <div className="sm:hidden glass fixed bottom-0 left-0 right-0 z-30 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border/70">
           <div className="max-w-2xl mx-auto flex gap-2">
             <button
               onClick={() => setUploadOpen(true)}

@@ -96,7 +96,7 @@ export default function Board({
     >
       <div
         ref={scrollRef}
-        className={'relative z-10 flex gap-3.5 overflow-x-auto px-4 sm:px-6 pt-1 pb-32 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
+        className={'relative z-10 flex gap-3.5 overflow-x-auto px-4 sm:px-6 pt-4 pb-32 sm:pb-14 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
       >
         {FASES.map((fase) => (
           <Column key={fase} fase={fase} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} />
