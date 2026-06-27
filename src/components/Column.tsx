@@ -15,6 +15,7 @@ const FASE_COR: Record<Fase, string> = {
 export default function Column({
   fase,
   cards,
+  arrastando,
   onArchive,
   onPushSemana,
   onDelete,
@@ -22,6 +23,7 @@ export default function Column({
 }: {
   fase: Fase
   cards: Card[]
+  arrastando?: boolean
   onArchive: (id: string) => void
   onPushSemana?: (id: string) => void
   onDelete?: (id: string) => void
@@ -32,11 +34,9 @@ export default function Column({
   return (
     <section className="shrink-0 w-[86vw] max-w-[300px] [scroll-snap-align:start]">
       <div className="flex items-center gap-2 px-1.5 pb-2.5">
-        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: cor, boxShadow: `0 0 8px ${cor}80` }} />
-        <h2 className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink-2">{fase}</h2>
-        <span className="tnum text-[11px] font-bold text-muted bg-surface-2 rounded-full px-1.5 min-w-[20px] text-center">
-          {cards.length}
-        </span>
+        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: cor }} />
+        <h2 className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink-2 truncate">{fase}</h2>
+        <span className="tnum text-[11px] font-semibold text-muted">{cards.length}</span>
       </div>
       <div
         ref={setNodeRef}
@@ -47,13 +47,11 @@ export default function Column({
             : 'bg-elev/50 border-border/50')
         }
       >
-        {cards.length === 0 ? (
-          <div className="grid place-items-center text-[12.5px] text-muted py-9 rounded-xl border border-dashed border-border/60">
-            solte aqui
-          </div>
-        ) : (
-          cards.map((card, i) => <DraggableCard key={card.id} card={card} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} index={i} />)
-        )}
+        {cards.length === 0
+          ? arrastando && (
+              <div className="grid place-items-center text-[12px] text-muted py-9 rounded-xl border border-dashed border-brand/40">solte aqui</div>
+            )
+          : cards.map((card, i) => <DraggableCard key={card.id} card={card} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} index={i} />)}
       </div>
     </section>
   )

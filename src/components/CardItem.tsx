@@ -1,14 +1,8 @@
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import type { Card, Urgencia } from '../types'
+import type { Card } from '../types'
 import { viewerUrl } from '../viewer'
-import { corDoProduto } from '../produtoCor'
-
-const urgColor: Record<Urgencia, string> = {
-  alta: 'text-red bg-red/15',
-  média: 'text-amber bg-amber/15',
-  baixa: 'text-green bg-green/15',
-}
+import { corPontoProduto } from '../produtoCor'
 
 export const CAT_COR: Record<string, string> = {
   'Conteúdo': 'text-sky-300 bg-sky-500/15',
@@ -16,6 +10,17 @@ export const CAT_COR: Record<string, string> = {
   'Institucional': 'text-violet-300 bg-violet-500/15',
   'Captação': 'text-emerald-300 bg-emerald-500/15',
 }
+
+// pontinhos sólidos por categoria (chip neutro + ponto colorido)
+export const CAT_DOT: Record<string, string> = {
+  'Conteúdo': 'bg-sky-400',
+  'Anúncio': 'bg-amber-400',
+  'Institucional': 'bg-violet-400',
+  'Captação': 'bg-emerald-400',
+}
+
+// chip neutro padrão do card (cor fica só nos pontos e na urgência Alta)
+const chipNeutro = 'inline-flex items-center gap-1 text-[11px] font-semibold text-ink-2 bg-surface-2 rounded-full px-2 py-0.5'
 
 function IconDoc() {
   return (
@@ -82,17 +87,32 @@ export function CardView({
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           </span>
         )}
-        <span className={'shrink-0 text-[9.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + urgColor[card.urgencia]}>
-          {card.urgencia}
-        </span>
+        {card.urgencia === 'alta' && (
+          <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 text-red bg-red/15">alta</span>
+        )}
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        {card.copy && <span className="text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>}
-        {card.semRoteiro && <span className="text-[10.5px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
-        {card.categoria && <span className={'text-[10.5px] font-bold rounded-full px-2 py-0.5 ' + (CAT_COR[card.categoria] ?? 'text-muted bg-surface-2')}>{card.categoria}</span>}
-        {card.produto && <span className={'text-[10.5px] font-bold border rounded-full px-2 py-0.5 max-w-[150px] truncate ' + corDoProduto(card.produto)}>{card.produto}</span>}
-        {card.prazo && <span className="text-[10.5px] text-muted tnum">⏱ {card.prazo}</span>}
+        {card.copy && <span className={chipNeutro}>{card.copy}</span>}
+        {card.categoria && (
+          <span className={chipNeutro}>
+            <span className={'h-1.5 w-1.5 rounded-full shrink-0 ' + (CAT_DOT[card.categoria] ?? 'bg-border-strong')} />
+            {card.categoria}
+          </span>
+        )}
+        {card.produto && (
+          <span className={chipNeutro + ' max-w-[160px]'}>
+            <span className={'h-1.5 w-1.5 rounded-full shrink-0 ' + corPontoProduto(card.produto)} />
+            <span className="truncate">{card.produto}</span>
+          </span>
+        )}
+        {card.semRoteiro && <span className="text-[11px] font-semibold text-muted bg-surface-2 rounded-full px-2 py-0.5">sem roteiro</span>}
+        {card.prazo && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-muted tnum">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            {card.prazo}
+          </span>
+        )}
       </div>
 
       {card.documentos.length > 0 && (

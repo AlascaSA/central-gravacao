@@ -15,8 +15,33 @@ const PALETA = [
   'text-lime-300 bg-lime-500/15 border-lime-500/30',
 ]
 
-export function corDoProduto(nome: string): string {
+// Pontinhos sólidos (mesma família de cor da PALETA, mesma ordem) — pro chip neutro
+// com um ponto colorido que distingue o produto sem pintar a pílula inteira.
+const PONTOS = [
+  'bg-sky-400',
+  'bg-emerald-400',
+  'bg-amber-400',
+  'bg-violet-400',
+  'bg-rose-400',
+  'bg-cyan-400',
+  'bg-fuchsia-400',
+  'bg-orange-400',
+  'bg-teal-400',
+  'bg-indigo-400',
+  'bg-pink-400',
+  'bg-lime-400',
+]
+
+function hashProduto(nome: string): number {
   let h = 0
   for (let i = 0; i < nome.length; i++) h = (h * 31 + nome.charCodeAt(i)) >>> 0
-  return PALETA[h % PALETA.length]
+  return h
+}
+
+export function corDoProduto(nome: string): string {
+  return PALETA[hashProduto(nome) % PALETA.length]
+}
+
+export function corPontoProduto(nome: string): string {
+  return PONTOS[hashProduto(nome) % PONTOS.length]
 }
