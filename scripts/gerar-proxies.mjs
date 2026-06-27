@@ -53,16 +53,37 @@ function baixar(id, dest) {
   })
 }
 
-// encoder de vídeo: hardware no Mac (rápido), libx264 no Linux (nuvem do GitHub)
-const ENC = process.platform === 'darwin'
-  ? ['-c:v', 'h264_videotoolbox', '-b:v', '2500k', '-maxrate', '3500k', '-bufsize', '7000k']
-  : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-maxrate', '3500k', '-bufsize', '7000k']
+// duração via ffprobe (pra dimensionar o bitrate do proxy)
+function duracaoDe(file) {
+  return new Promise((res) => {
+    const p = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', file], { stdio: ['ignore', 'pipe', 'ignore'] })
+    let out = ''
+    p.stdout.on('data', (d) => (out += d))
+    p.on('close', () => res(parseFloat(out) || 0))
+    p.on('error', () => res(0))
+  })
+}
 
-function transcodificar(src, out) {
+// bitrate de vídeo (kbps) pra o proxy caber abaixo de ~45MB (limite do Supabase free); clipes curtos ficam em 2500
+function bitrateAlvo(dur) {
+  if (!dur || dur <= 0) return 2500
+  const v = Math.floor((45 * 8000) / dur) - 128 // 45MB total menos o áudio
+  return Math.max(700, Math.min(2500, v))
+}
+
+// encoder: hardware no Mac (rápido), libx264 no Linux (nuvem do GitHub)
+function encArgs(vKbps) {
+  const mr = Math.round(vKbps * 1.45)
+  return process.platform === 'darwin'
+    ? ['-c:v', 'h264_videotoolbox', '-b:v', vKbps + 'k', '-maxrate', mr + 'k', '-bufsize', mr * 2 + 'k']
+    : ['-c:v', 'libx264', '-preset', 'veryfast', '-b:v', vKbps + 'k', '-maxrate', mr + 'k', '-bufsize', mr * 2 + 'k']
+}
+
+function transcodificar(src, out, vKbps) {
   const args = [
     '-y', '-i', src,
     '-vf', "scale='min(1920,iw)':-2",
-    ...ENC,
+    ...encArgs(vKbps),
     '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
     out,
@@ -93,8 +114,9 @@ async function processar(f) {
   try {
     process.stdout.write(`• ${f.name} (${f.size ? mb(Number(f.size)) : '?'}) baixando…`)
     await baixar(f.id, src)
-    process.stdout.write(' transcodificando…')
-    await transcodificar(src, out)
+    const vKbps = bitrateAlvo(await duracaoDe(src))
+    process.stdout.write(` transcodificando(${vKbps}k)…`)
+    await transcodificar(src, out, vKbps)
     process.stdout.write(' subindo…')
     const tam = await subir(f.id, out)
     console.log(` OK ${mb(tam)}`)
