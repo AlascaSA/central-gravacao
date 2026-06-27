@@ -9,7 +9,7 @@ const FASE_COR: Record<Fase, string> = {
   'Em edição': '#22c1c3',
   Finalizado: '#2bd47f',
   'No tráfego': '#7ce38b',
-  'Jaylton deve gravar': '#f5a524',
+  'para Jaylton gravar': '#f5a524',
 }
 
 export default function Column({

@@ -1,4 +1,4 @@
-export const FASES = ['A gravar', 'A editar', 'Em edição', 'Finalizado', 'No tráfego', 'Jaylton deve gravar'] as const
+export const FASES = ['A gravar', 'A editar', 'Em edição', 'Finalizado', 'No tráfego', 'para Jaylton gravar'] as const
 export type Fase = (typeof FASES)[number]
 
 export const COPYS = ['Andressa', 'Sofia', 'Thayná', 'Sem roteiro'] as const
