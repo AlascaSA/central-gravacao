@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { listarLinks, criarLink, editarLink, deletarLink, type Link } from '../data/links'
 
 // sugestões iniciais de grupo (só atalho — nada é criado até ter um link)
@@ -19,25 +19,6 @@ function dominio(u: string): string {
 }
 function ehPasta(u: string): boolean {
   return /drive\.google\.com\/drive|drive\.google\.com\/folders/i.test(u)
-}
-
-// "PROD — Vendas" → { prod: "PROD", variante: "Vendas" }; sem separador → variante null
-function parseTitulo(t: string): { prod: string; variante: string | null } {
-  const m = t.match(/^(.+?)\s+[—–-]\s+(.+)$/)
-  return m ? { prod: m[1].trim(), variante: m[2].trim() } : { prod: t.trim(), variante: null }
-}
-function agruparPorProduto(links: Link[]): [string, Link[]][] {
-  const m = new Map<string, Link[]>()
-  for (const l of links) {
-    const { prod } = parseTitulo(l.titulo)
-    if (!m.has(prod)) m.set(prod, [])
-    m.get(prod)!.push(l)
-  }
-  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-}
-
-function IconeAbrir() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M7 17 17 7M9 7h8v8" /></svg>
 }
 
 function IconePasta() {
@@ -215,55 +196,19 @@ export default function Links() {
       )}
 
       {grupoSel && (
-        <div className="flex flex-col gap-2">
-          {agruparPorProduto(grupoSel[1]).map(([prod, links]) => {
-              const temVar = links.some((l) => parseTitulo(l.titulo).variante)
-              // sem variante (ex.: pasta avulsa): cada link como card simples
-              if (!temVar) {
-                return (
-                  <Fragment key={prod}>
-                    {links.map((l) => (
-                      <div key={l.id} className="group rounded-xl border border-border bg-surface hover:border-border-strong transition-colors flex items-center gap-3 pl-3.5 pr-2.5 py-2.5">
-                        <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(l.url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
-                          {ehPasta(l.url) ? <IconePasta /> : <IconeLink />}
-                        </span>
-                        <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
-                          <div className="text-[14px] font-semibold text-ink truncate group-hover:text-brand-2 transition-colors">{l.titulo}</div>
-                          <div className="text-[12px] text-muted truncate">{dominio(l.url)}</div>
-                        </a>
-                        {acoesLink(l)}
-                      </div>
-                    ))}
-                  </Fragment>
-                )
-              }
-              // com variante: o produto aparece uma vez, com Vendas/Remarketing como linhas dentro
-              return (
-                <div key={prod} className="rounded-xl border border-border bg-surface overflow-hidden">
-                  <div className="flex items-center gap-2.5 px-3.5 pt-2.5 pb-2">
-                    <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(links[0].url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
-                      {ehPasta(links[0].url) ? <IconePasta /> : <IconeLink />}
-                    </span>
-                    <span className="min-w-0 flex-1 text-[14px] font-bold text-ink truncate">{prod}</span>
-                    <span className="shrink-0 text-[11px] text-muted truncate max-w-[120px]">{dominio(links[0].url)}</span>
-                  </div>
-                  <div className="border-t border-border/60">
-                    {links
-                      .slice()
-                      .sort((a, b) => (parseTitulo(a.titulo).variante || '').localeCompare(parseTitulo(b.titulo).variante || ''))
-                      .map((l) => (
-                        <div key={l.id} className="group flex items-center gap-2 pl-3.5 pr-2.5 py-1.5 border-b border-border/40 last:border-0 hover:bg-surface-2/40 transition-colors">
-                          <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 inline-flex items-center gap-1.5 text-[13px] text-ink-2 hover:text-brand-2 truncate transition-colors">
-                            <IconeAbrir />
-                            <span className="truncate">{parseTitulo(l.titulo).variante}</span>
-                          </a>
-                          {acoesLink(l)}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )
-          })}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {[...grupoSel[1]].sort((a, b) => a.titulo.localeCompare(b.titulo)).map((l) => (
+            <div key={l.id} className="group rounded-xl border border-border bg-surface hover:border-border-strong transition-colors flex items-center gap-3 pl-3.5 pr-2.5 py-2.5">
+              <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(l.url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
+                {ehPasta(l.url) ? <IconePasta /> : <IconeLink />}
+              </span>
+              <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
+                <div className="text-[14px] font-semibold text-ink truncate group-hover:text-brand-2 transition-colors">{l.titulo}</div>
+                <div className="text-[12px] text-muted truncate">{dominio(l.url)}</div>
+              </a>
+              {acoesLink(l)}
+            </div>
+          ))}
         </div>
       )}
     </div>
