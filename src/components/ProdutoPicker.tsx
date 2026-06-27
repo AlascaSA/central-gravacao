@@ -68,6 +68,11 @@ export default function ProdutoPicker({ value, onChange }: { value?: string; onC
               + Adicionar e salvar “{busca.trim()}”
             </button>
           )}
+          {value && (
+            <button type="button" onClick={() => { onChange(''); setOpen(false); setBusca('') }} className="mt-2 w-full text-left text-[12.5px] font-semibold text-muted hover:text-rose-300 transition-colors px-1 py-1">
+              ✕ Remover produto
+            </button>
+          )}
         </div>
       )}
     </div>

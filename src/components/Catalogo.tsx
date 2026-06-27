@@ -142,7 +142,28 @@ export default function Catalogo() {
 
   const mesAtual = nav.mes ? arvore.find((m) => m.mes === nav.mes) || null : null
   const diaAtual = mesAtual && nav.dia ? mesAtual.dias.get(nav.dia) || null : null
-  const videosVisiveis = diaAtual ? diaAtual.videos : []
+
+  // filtros do catálogo (quando algum está ativo, mostra grade plana de tudo que casa)
+  const [fTipo, setFTipo] = useState<'todas' | TipoBruto>('todas')
+  const [fProduto, setFProduto] = useState('')
+  const [fSemana, setFSemana] = useState('')
+  const filtrando = fTipo !== 'todas' || !!fProduto || !!fSemana
+  const produtoDoBruto = (b: Bruto) => { const cid = classif[b.id]?.card_id; return cid ? cards.find((c) => c.id === cid)?.produto : undefined }
+  const semanaDoBruto = (b: Bruto) => (b.criado ? semanaDeGravacao(new Date(b.criado)) : '')
+  const filtrados = useMemo(() => {
+    if (!brutos) return []
+    return brutos.filter((b) => {
+      if (fTipo !== 'todas' && (classif[b.id]?.tipo || classif[b.id]?.ia_tipo) !== fTipo) return false
+      if (fProduto && produtoDoBruto(b) !== fProduto) return false
+      if (fSemana && semanaDoBruto(b) !== fSemana) return false
+      return true
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brutos, classif, cards, fTipo, fProduto, fSemana])
+
+  const videosVisiveis = filtrando ? filtrados : diaAtual ? diaAtual.videos : []
+  const produtosFiltro = [...new Set(cards.map((c) => c.produto).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b))
+  const semanasFiltro = [...new Set((brutos || []).map(semanaDoBruto).filter(Boolean))].sort().reverse()
 
   const aberto = idx != null ? videosVisiveis[idx] ?? null : null
   const temPrev = idx != null && idx > 0
@@ -239,6 +260,37 @@ export default function Catalogo() {
 
   const navBtn = 'h-8 w-8 grid place-items-center rounded-lg bg-surface-2 border border-border text-muted disabled:opacity-30 hover:text-ink transition-colors text-[18px] leading-none'
 
+  const cardEl = (b: Bruto, i: number) => {
+    const marcado = sel.has(b.id)
+    const cl = classif[b.id]
+    const t = cl?.tipo || cl?.ia_tipo || null
+    const confirmado = !!cl?.confirmado
+    return (
+      <button key={b.id} onClick={() => setIdx(i)} className={'group text-left rounded-2xl border bg-surface p-3 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition-all ' + (marcado ? 'border-brand/70' : 'border-border hover:border-border-strong')}>
+        <div className="relative aspect-video rounded-xl bg-surface-2 border border-border overflow-hidden mb-2 grid place-items-center text-muted">
+          <svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+          {b.thumb && <img src={b.thumb} alt="" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} className="absolute inset-0 h-full w-full object-cover" />}
+          <span className="absolute inset-0 grid place-items-center bg-black/0 group-hover:bg-black/25 transition-colors">
+            <span className="h-9 w-9 rounded-full bg-black/0 group-hover:bg-black/55 backdrop-blur-sm grid place-items-center opacity-0 group-hover:opacity-100 transition-all">
+              <svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white" /></svg>
+            </span>
+          </span>
+          <span role="checkbox" aria-checked={marcado} onClick={(e) => { e.stopPropagation(); toggleSel(b.id) }} className={'absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' + (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-0 group-hover:opacity-100 ' + (sel.size > 0 ? 'opacity-70' : ''))}>
+            {marcado && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+          </span>
+          {t && (
+            <span className={'absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold backdrop-blur-sm ' + TIPO_META[t].badge + (confirmado ? '' : ' opacity-90')}>
+              {!confirmado && <span className="text-[8px] font-semibold opacity-70">IA</span>}
+              {TIPO_META[t].label}
+            </span>
+          )}
+        </div>
+        <div className="text-[13px] font-bold truncate">{b.nome}</div>
+        <div className="text-[11.5px] text-muted tnum mt-0.5">{fmtDur(b.seg)}</div>
+      </button>
+    )
+  }
+
   return (
     <div className="relative z-10 px-4 sm:px-6 pb-24 max-w-5xl mx-auto">
       <div className="flex items-center gap-2 pt-3 pb-3">
@@ -275,77 +327,56 @@ export default function Catalogo() {
 
       {brutos && brutos.length > 0 && (
         <>
-          <div className="flex items-center gap-1.5 text-[13px] mb-3 flex-wrap">
-            <button onClick={() => irPara(null, null)} className={nav.mes ? 'text-muted hover:text-ink' : 'text-ink font-bold'}>Tudo</button>
-            {nav.mes && <><span className="text-muted">›</span><button onClick={() => irPara(nav.mes, null)} className={nav.dia ? 'text-muted hover:text-ink' : 'text-ink font-bold'}>{nav.mes}</button></>}
-            {nav.dia && <><span className="text-muted">›</span><span className="text-ink font-bold">Dia {nav.dia}</span></>}
+          {/* filtros */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-3">
+            <button onClick={() => setFTipo('todas')} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === 'todas' ? 'bg-brand/15 border-brand/50 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>Todas</button>
+            {TIPOS.map((v) => (
+              <button key={v} onClick={() => setFTipo(v)} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === v ? TIPO_META[v].badge : 'bg-surface-2 border-border text-muted hover:text-ink')}>{TIPO_META[v].label}</button>
+            ))}
+            <span className="w-px h-5 bg-border mx-0.5" />
+            <select value={fProduto} onChange={(e) => setFProduto(e.target.value)} className={'h-[34px] rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fProduto ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
+              <option value="">Produto: todos</option>
+              {produtosFiltro.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={fSemana} onChange={(e) => setFSemana(e.target.value)} className={'h-[34px] rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fSemana ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
+              <option value="">Semana: todas</option>
+              {semanasFiltro.map((s) => <option key={s} value={s}>{'Semana ' + s.slice(8, 10) + '/' + s.slice(5, 7)}</option>)}
+            </select>
+            {filtrando && <button onClick={() => { setFTipo('todas'); setFProduto(''); setFSemana('') }} className="text-[12px] font-medium text-muted hover:text-rose-300 ml-0.5">limpar</button>}
           </div>
 
-          {!nav.mes && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {arvore.map((m) => {
-                const tot = [...m.dias.values()].reduce((s, d) => s + d.videos.length, 0)
-                return <FolderCard key={m.mes} label={m.mes} sub={tot + ' vídeo' + (tot > 1 ? 's' : '')} onClick={() => irPara(m.mes, null)} />
-              })}
-            </div>
-          )}
+          {filtrando ? (
+            <>
+              <div className="text-[12px] text-muted mb-2 tnum">{filtrados.length} vídeo{filtrados.length === 1 ? '' : 's'}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{videosVisiveis.map(cardEl)}</div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5 text-[13px] mb-3 flex-wrap">
+                <button onClick={() => irPara(null, null)} className={nav.mes ? 'text-muted hover:text-ink' : 'text-ink font-bold'}>Tudo</button>
+                {nav.mes && <><span className="text-muted">›</span><button onClick={() => irPara(nav.mes, null)} className={nav.dia ? 'text-muted hover:text-ink' : 'text-ink font-bold'}>{nav.mes}</button></>}
+                {nav.dia && <><span className="text-muted">›</span><span className="text-ink font-bold">Dia {nav.dia}</span></>}
+              </div>
 
-          {nav.mes && !nav.dia && mesAtual && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {[...mesAtual.dias.values()].sort((a, b) => b.diaOrd - a.diaOrd).map((d) => (
-                <FolderCard key={d.dia} label={'Dia ' + d.dia} sub={d.videos.length + ' vídeo' + (d.videos.length > 1 ? 's' : '')} onClick={() => irPara(nav.mes, d.dia)} />
-              ))}
-            </div>
-          )}
-
-          {nav.dia && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {videosVisiveis.map((b, i) => {
-            const marcado = sel.has(b.id)
-            const cl = classif[b.id]
-            const t = cl?.tipo || cl?.ia_tipo || null
-            const confirmado = !!cl?.confirmado
-            return (
-              <button
-                key={b.id}
-                onClick={() => setIdx(i)}
-                className={
-                  'group text-left rounded-2xl border bg-surface p-3 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition-all ' +
-                  (marcado ? 'border-brand/70' : 'border-border hover:border-border-strong')
-                }
-              >
-                <div className="relative aspect-video rounded-xl bg-surface-2 border border-border overflow-hidden mb-2 grid place-items-center text-muted">
-                  <svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
-                  {b.thumb && <img src={b.thumb} alt="" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} className="absolute inset-0 h-full w-full object-cover" />}
-                  <span className="absolute inset-0 grid place-items-center bg-black/0 group-hover:bg-black/25 transition-colors">
-                    <span className="h-9 w-9 rounded-full bg-black/0 group-hover:bg-black/55 backdrop-blur-sm grid place-items-center opacity-0 group-hover:opacity-100 transition-all">
-                      <svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white" /></svg>
-                    </span>
-                  </span>
-                  <span
-                    role="checkbox"
-                    aria-checked={marcado}
-                    onClick={(e) => { e.stopPropagation(); toggleSel(b.id) }}
-                    className={
-                      'absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' +
-                      (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-0 group-hover:opacity-100 ' + (sel.size > 0 ? 'opacity-70' : ''))
-                    }
-                  >
-                    {marcado && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
-                  </span>
-                  {t && (
-                    <span className={'absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold backdrop-blur-sm ' + TIPO_META[t].badge + (confirmado ? '' : ' opacity-90')}>
-                      {!confirmado && <span className="text-[8px] font-semibold opacity-70">IA</span>}
-                      {TIPO_META[t].label}
-                    </span>
-                  )}
+              {!nav.mes && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {arvore.map((m) => {
+                    const tot = [...m.dias.values()].reduce((s, d) => s + d.videos.length, 0)
+                    return <FolderCard key={m.mes} label={m.mes} sub={tot + ' vídeo' + (tot > 1 ? 's' : '')} onClick={() => irPara(m.mes, null)} />
+                  })}
                 </div>
-                <div className="text-[13px] font-bold truncate">{b.nome}</div>
-                <div className="text-[11.5px] text-muted tnum mt-0.5">{fmtDur(b.seg)}</div>
-              </button>
-            )
-          })}
-            </div>
+              )}
+
+              {nav.mes && !nav.dia && mesAtual && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {[...mesAtual.dias.values()].sort((a, b) => b.diaOrd - a.diaOrd).map((d) => (
+                    <FolderCard key={d.dia} label={'Dia ' + d.dia} sub={d.videos.length + ' vídeo' + (d.videos.length > 1 ? 's' : '')} onClick={() => irPara(nav.mes, d.dia)} />
+                  ))}
+                </div>
+              )}
+
+              {nav.dia && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{videosVisiveis.map(cardEl)}</div>}
+            </>
           )}
         </>
       )}

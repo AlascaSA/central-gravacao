@@ -32,6 +32,7 @@ export interface Card {
   prazo?: string
   documentos: Doc[]
   observacoes?: string
+  comentario?: string
   arquivado: boolean
   criadoEm: string
   atualizadoEm: string

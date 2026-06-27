@@ -3,7 +3,7 @@ import type { Card, Categoria } from '../types'
 import { CATEGORIAS } from '../types'
 import { viewerUrl } from '../viewer'
 import { store } from '../data/store'
-import { listarBrutosDoCard, ligarBruto, type BrutoLigado } from '../data/catalogoBrutos'
+import { listarBrutosDoCard, ligarBruto, comentarBruto, type BrutoLigado } from '../data/catalogoBrutos'
 import { CAT_COR } from './CardItem'
 import ProdutoPicker from './ProdutoPicker'
 
@@ -32,12 +32,14 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [tit, setTit] = useState(card?.titulo || '')
   const [editTit, setEditTit] = useState(false)
   const [titTmp, setTitTmp] = useState('')
+  const [coment, setComent] = useState(card?.comentario || '')
 
   useEffect(() => {
     setCat(card?.categoria)
     setProd(card?.produto)
     setTit(card?.titulo || '')
     setEditTit(false)
+    setComent(card?.comentario || '')
     setPlaying(null)
     if (card) listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
     else setLinked([])
@@ -65,6 +67,12 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
       store.definirTitulo(card!.id, novo).catch(() => {})
     }
     setEditTit(false)
+  }
+  function salvarComentario() {
+    store.definirComentario(card!.id, coment).catch(() => {})
+  }
+  function mudarComentTomada(drive_id: string, txt: string) {
+    setLinked((ls) => ls.map((b) => (b.drive_id === drive_id ? { ...b, comentario: txt } : b)))
   }
 
   return (
@@ -122,6 +130,16 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Produto</div>
           <div className="mb-4"><ProdutoPicker value={prod} onChange={trocarProd} /></div>
 
+          <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Comentário</div>
+          <textarea
+            value={coment}
+            onChange={(e) => setComent(e.target.value)}
+            onBlur={salvarComentario}
+            placeholder="Anotação sobre a tarefa…"
+            rows={2}
+            className="w-full mb-4 px-3 py-2 rounded-xl bg-surface border border-border text-[14px] text-ink outline-none focus:border-brand/60 resize-none placeholder:text-muted"
+          />
+
           {card.documentos.length > 0 && (
             <div className="flex flex-col gap-2 mb-4">
               {card.documentos.map((d, i) => (
@@ -162,6 +180,13 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                         </button>
                       </div>
+                      <input
+                        value={b.comentario || ''}
+                        onChange={(e) => mudarComentTomada(b.drive_id, e.target.value)}
+                        onBlur={(e) => comentarBruto(b.drive_id, e.target.value).catch(() => {})}
+                        placeholder="Comentário da tomada…"
+                        className="w-full mt-2 h-8 px-2.5 rounded-lg bg-surface-2 border border-border text-[12.5px] text-ink-2 outline-none focus:border-brand/50 placeholder:text-muted"
+                      />
                       {tocando && (
                         <video src={proxyDe(b.drive_id)} controls autoPlay playsInline className="w-full mt-2 rounded-lg bg-black max-h-[40vh]" />
                       )}

@@ -16,6 +16,8 @@ export interface Store {
   archiveCard(id: string): Promise<Card>
   /** Renomeia a tarefa (título do card). */
   definirTitulo(id: string, titulo: string): Promise<Card>
+  /** Define/troca o comentário do card. */
+  definirComentario(id: string, comentario: string): Promise<Card>
   /** Define/troca a categoria da tarefa. */
   definirCategoria(id: string, categoria: Categoria): Promise<Card>
   /** Define/troca o produto da tarefa. */
@@ -101,6 +103,13 @@ export function createMockStore(): Store {
       const c = cards.find((x) => x.id === id)
       if (!c) throw new Error('Card não encontrado')
       c.titulo = titulo.trim()
+      c.atualizadoEm = agora()
+      return { ...c }
+    },
+    async definirComentario(id, comentario) {
+      const c = cards.find((x) => x.id === id)
+      if (!c) throw new Error('Card não encontrado')
+      c.comentario = comentario
       c.atualizadoEm = agora()
       return { ...c }
     },

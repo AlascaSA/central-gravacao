@@ -20,6 +20,7 @@ export interface BrutoLigado {
   nome: string | null
   tipo: TipoBruto | null
   ia_tipo: TipoBruto | null
+  comentario: string | null
 }
 
 // Lê as classificações (proposta da IA + confirmação). Degrada pra {} se a tabela ainda não existe.
@@ -46,8 +47,14 @@ export async function ligarBruto(drive_id: string, card_id: string | null, nome?
 // Brutos ligados a uma tarefa (pra mostrar no card).
 export async function listarBrutosDoCard(card_id: string): Promise<BrutoLigado[]> {
   if (!supabase) return []
-  const { data } = await supabase.from('brutos').select('drive_id,nome,tipo,ia_tipo').eq('card_id', card_id)
+  const { data } = await supabase.from('brutos').select('drive_id,nome,tipo,ia_tipo,comentario').eq('card_id', card_id)
   return (data as BrutoLigado[]) || []
+}
+
+// Comentário numa tomada (bruto).
+export async function comentarBruto(drive_id: string, comentario: string): Promise<void> {
+  if (!supabase) return
+  await supabase.from('brutos').upsert({ drive_id, comentario }, { onConflict: 'drive_id' })
 }
 
 // Humano confirma/corrige o tipo. Vira exemplo (few-shot) pras próximas classificações.

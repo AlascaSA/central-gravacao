@@ -18,6 +18,7 @@ interface Row {
   prazo: string | null
   documentos: Doc[] | null
   observacoes: string | null
+  comentario: string | null
   arquivado: boolean
   criado_em: string
   atualizado_em: string
@@ -40,6 +41,7 @@ function toCard(r: Row): Card {
     prazo: r.prazo ?? undefined,
     documentos: Array.isArray(r.documentos) ? r.documentos : [],
     observacoes: r.observacoes ?? undefined,
+    comentario: r.comentario ?? undefined,
     arquivado: Boolean(r.arquivado),
     criadoEm: r.criado_em,
     atualizadoEm: r.atualizado_em,
@@ -127,6 +129,16 @@ export function createSupabaseStore(): Store {
       const { data, error } = await sb
         .from('cards')
         .update({ titulo: titulo.trim(), atualizado_em: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      return toCard(data as Row)
+    },
+    async definirComentario(id, comentario) {
+      const { data, error } = await sb
+        .from('cards')
+        .update({ comentario, atualizado_em: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single()
