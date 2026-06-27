@@ -10,7 +10,7 @@ export default function Header({ vista, onVista }: { vista: Vista; onVista: (v: 
         <span className="hidden sm:block h-5 w-px bg-border-strong shrink-0" aria-hidden />
         <h1 className="hidden sm:block text-[15px] font-bold tracking-[-0.01em] text-ink-2 truncate">Central de Gravação</h1>
       </div>
-      <div className="flex bg-surface/80 border border-border rounded-xl p-1 text-[12.5px] sm:text-[13px] font-semibold shrink-0">
+      <div className="flex bg-surface/80 border border-border rounded-xl p-1 text-[12px] sm:text-[13px] font-semibold shrink-0">
         {(Object.keys(LABEL) as Vista[]).map((v) => (
           <button
             key={v}

@@ -97,11 +97,11 @@ export default function UploadModal({
       <div className="sheet-up relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong" />
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-1">Subir roteiros</h3>
-        <p className="text-[12.5px] text-muted mb-5">A IA lê cada documento e cria um card por vídeo.</p>
+        <p className="text-[12px] text-muted mb-5">A IA lê cada documento e cria um card por vídeo.</p>
 
         {!resultado && (
           <>
-            <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Copy responsável</label>
+            <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy responsável</label>
             <div className="grid grid-cols-2 gap-2 mb-4">
               {COPYS.map((c) => (
                 <button
@@ -110,7 +110,7 @@ export default function UploadModal({
                   onClick={() => setCopy(c)}
                   className={
                     'h-11 rounded-xl border text-[14px] font-semibold transition-all active:scale-95 disabled:opacity-50 ' +
-                    (copy === c ? 'bg-brand border-brand text-white shadow-[0_4px_14px_rgba(20,168,245,0.35)]' : 'bg-surface border-border text-ink-2')
+                    (copy === c ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface border-border text-ink-2')
                   }
                 >
                   {c}
@@ -118,7 +118,7 @@ export default function UploadModal({
               ))}
             </div>
 
-            <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Categoria das tarefas</label>
+            <label className="block text-[12px] font-semibold text-muted mb-1.5">Categoria das tarefas</label>
             <div className="grid grid-cols-2 gap-2 mb-4">
               {CATEGORIAS.map((c) => (
                 <button
@@ -127,7 +127,7 @@ export default function UploadModal({
                   onClick={() => setCategoria(c)}
                   className={
                     'h-11 rounded-xl border text-[14px] font-semibold transition-all active:scale-95 disabled:opacity-50 ' +
-                    (categoria === c ? 'bg-brand border-brand text-white shadow-[0_4px_14px_rgba(20,168,245,0.35)]' : 'bg-surface border-border text-ink-2')
+                    (categoria === c ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface border-border text-ink-2')
                   }
                 >
                   {c}
@@ -135,24 +135,24 @@ export default function UploadModal({
               ))}
             </div>
 
-            <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Produto</label>
+            <label className="block text-[12px] font-semibold text-muted mb-1.5">Produto</label>
             <div className="mb-4"><ProdutoPicker value={produto || undefined} onChange={setProduto} /></div>
 
             <div className="flex gap-3 mb-4">
               <div className="flex-1">
-                <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Campanha</label>
+                <label className="block text-[12px] font-semibold text-muted mb-1.5">Campanha</label>
                 <input value={campanha} onChange={(e) => setCampanha(e.target.value)} disabled={rodando} placeholder="opcional" className="w-full h-11 px-3.5 rounded-xl bg-surface border border-border text-ink text-[15px] outline-none focus:border-brand/70 placeholder:text-muted disabled:opacity-50" />
               </div>
               <div className="w-[110px]">
-                <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Prazo</label>
+                <label className="block text-[12px] font-semibold text-muted mb-1.5">Prazo</label>
                 <input value={prazo} onChange={(e) => setPrazo(e.target.value)} disabled={rodando} placeholder="dd/mm" inputMode="numeric" className="w-full h-11 px-3.5 rounded-xl bg-surface border border-border text-ink text-[15px] outline-none focus:border-brand/70 placeholder:text-muted disabled:opacity-50" />
               </div>
             </div>
 
-            <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Urgência</label>
+            <label className="block text-[12px] font-semibold text-muted mb-1.5">Urgência</label>
             <div className="grid grid-cols-3 gap-2 mb-4">
               {URGENCIAS.map((u) => (
-                <button key={u} disabled={rodando} onClick={() => setUrgencia(u)} className={'h-11 rounded-xl border text-[14px] font-semibold capitalize transition-all active:scale-95 disabled:opacity-50 ' + (urgencia === u ? 'bg-brand border-brand text-white shadow-[0_4px_14px_rgba(20,168,245,0.35)]' : 'bg-surface border-border text-ink-2')}>{u}</button>
+                <button key={u} disabled={rodando} onClick={() => setUrgencia(u)} className={'h-11 rounded-xl border text-[14px] font-semibold capitalize transition-all active:scale-95 disabled:opacity-50 ' + (urgencia === u ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface border-border text-ink-2')}>{u}</button>
               ))}
             </div>
 
@@ -169,7 +169,7 @@ export default function UploadModal({
               <span className="text-[14px] font-semibold text-ink">
                 {files.length ? files.length + ' documento' + (files.length > 1 ? 's' : '') + ' escolhido' + (files.length > 1 ? 's' : '') : 'Escolher documentos'}
               </span>
-              <span className="text-[11.5px] text-muted">.docx · .pdf · .txt — pode vários de uma vez</span>
+              <span className="text-[12px] text-muted">.docx · .pdf · .txt — pode vários de uma vez</span>
               <input
                 type="file"
                 multiple
@@ -223,7 +223,7 @@ export default function UploadModal({
             {resultado.erros.length > 0 && (
               <div className="flex flex-col gap-1 mb-4 max-h-28 overflow-y-auto">
                 {resultado.erros.map((er, i) => (
-                  <div key={i} className="text-[11.5px] text-amber bg-amber/10 border border-amber/20 rounded-lg px-2.5 py-1.5">{er}</div>
+                  <div key={i} className="text-[12px] text-amber bg-amber/10 border border-amber/20 rounded-lg px-2.5 py-1.5">{er}</div>
                 ))}
               </div>
             )}

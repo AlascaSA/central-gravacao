@@ -196,7 +196,7 @@ export default function App() {
             </button>
             <button
               onClick={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? 'Andressa' : filtro)}
-              className="flex-1 h-[52px] rounded-2xl bg-surface-2 border border-border text-ink font-semibold text-[13.5px] active:scale-[0.98] hover:border-border-strong transition-all"
+              className="flex-1 h-[52px] rounded-2xl bg-surface-2 border border-border text-ink font-semibold text-[13px] active:scale-[0.98] hover:border-border-strong transition-all"
             >
               + Novo
             </button>

@@ -57,7 +57,7 @@ export default function NewCardModal({
   function pill(ativo: boolean) {
     return (
       'h-11 rounded-xl border text-[14px] font-semibold transition-all active:scale-95 ' +
-      (ativo ? 'bg-brand border-brand text-white shadow-[0_4px_14px_rgba(20,168,245,0.35)]' : 'bg-surface border-border text-ink-2 hover:border-border-strong')
+      (ativo ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface border-border text-ink-2 hover:border-border-strong')
     )
   }
 
@@ -68,7 +68,7 @@ export default function NewCardModal({
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong" />
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-5">Novo card</h3>
 
-        <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Copy</label>
+        <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy</label>
         <div className="grid grid-cols-2 gap-2 mb-3">
           {COPYS.map((c) => (
             <button key={c} onClick={() => setCopy(c)} className={pill(copy === c)}>
@@ -78,7 +78,7 @@ export default function NewCardModal({
         </div>
         <button
           onClick={() => setSemRoteiro((v) => !v)}
-          className={'mb-4 h-10 px-3.5 rounded-xl border text-[13.5px] font-semibold transition-all active:scale-95 inline-flex items-center gap-2 ' + (semRoteiro ? 'text-amber bg-amber/12 border-amber/40' : 'bg-surface border-border text-muted hover:text-ink')}
+          className={'mb-4 h-10 px-3.5 rounded-xl border text-[13px] font-semibold transition-all active:scale-95 inline-flex items-center gap-2 ' + (semRoteiro ? 'text-amber bg-amber/12 border-amber/40' : 'bg-surface border-border text-muted hover:text-ink')}
         >
           <span className={'h-4 w-4 rounded grid place-items-center border ' + (semRoteiro ? 'bg-amber border-amber' : 'border-border-strong')}>
             {semRoteiro && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1a1205" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
@@ -86,7 +86,7 @@ export default function NewCardModal({
           Sem roteiro escrito
         </button>
 
-        <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Categoria</label>
+        <label className="block text-[12px] font-semibold text-muted mb-1.5">Categoria</label>
         <div className="grid grid-cols-2 gap-2 mb-4">
           {CATEGORIAS.map((c) => (
             <button key={c} onClick={() => setCategoria(c)} className={pill(categoria === c)}>
@@ -95,10 +95,10 @@ export default function NewCardModal({
           ))}
         </div>
 
-        <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Produto</label>
+        <label className="block text-[12px] font-semibold text-muted mb-1.5">Produto</label>
         <div className="mb-4"><ProdutoPicker value={produto || undefined} onChange={setProduto} /></div>
 
-        <label className="block text-[12.5px] font-semibold text-muted mb-1.5">Título do vídeo</label>
+        <label className="block text-[12px] font-semibold text-muted mb-1.5">Título do vídeo</label>
         <input className={inputCls + ' mb-6'} value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Dívida de ITBI" autoFocus />
 
         <div className="flex gap-2.5">

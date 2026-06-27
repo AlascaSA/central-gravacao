@@ -14,7 +14,7 @@ function rotuloMes(ym: string): string {
 }
 
 const selCls = (ativo: boolean) =>
-  'h-11 rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' +
+  'h-11 rounded-lg border bg-surface-2 px-2 text-[12px] outline-none cursor-pointer ' +
   (ativo ? 'border-brand/50 text-ink' : 'border-border text-muted')
 
 export default function Archive({ cards }: { cards: Card[] }) {
@@ -64,7 +64,7 @@ export default function Archive({ cards }: { cards: Card[] }) {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar…"
-            className="h-11 w-40 rounded-lg border border-border bg-surface-2 pl-8 pr-2 text-[12.5px] text-ink outline-none focus:border-brand/50 placeholder:text-muted"
+            className="h-11 w-40 rounded-lg border border-border bg-surface-2 pl-8 pr-2 text-[12px] text-ink outline-none focus:border-brand/50 placeholder:text-muted"
           />
         </div>
         {produtos.length > 0 && (
@@ -118,9 +118,9 @@ export default function Archive({ cards }: { cards: Card[] }) {
                     </div>
                     <div className="text-[12px] text-muted flex flex-wrap items-center gap-1.5 mt-0.5">
                       {c.copy && <span>{c.copy}</span>}
-                      {c.semRoteiro && <span className="text-[10px] font-bold text-amber bg-amber/12 rounded-full px-1.5 py-0.5">sem roteiro</span>}
-                      {c.categoria && <span className={'text-[10px] font-bold rounded-full px-1.5 py-0.5 ' + (CAT_COR[c.categoria] ?? 'text-muted bg-surface-2')}>{c.categoria}</span>}
-                      {c.produto && <span className={'text-[10px] font-bold border rounded-full px-1.5 py-0.5 ' + corDoProduto(c.produto)}>{c.produto}</span>}
+                      {c.semRoteiro && <span className="text-[11px] font-bold text-amber bg-amber/12 rounded-full px-1.5 py-0.5">sem roteiro</span>}
+                      {c.categoria && <span className={'text-[11px] font-bold rounded-full px-1.5 py-0.5 ' + (CAT_COR[c.categoria] ?? 'text-muted bg-surface-2')}>{c.categoria}</span>}
+                      {c.produto && <span className={'text-[11px] font-bold border rounded-full px-1.5 py-0.5 ' + corDoProduto(c.produto)}>{c.produto}</span>}
                       {c.campanha && <span>· {c.campanha}</span>}
                     </div>
                   </div>

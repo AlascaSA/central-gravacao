@@ -113,7 +113,7 @@ export default function Links() {
         <h2 className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-2">Links da equipe</h2>
         {links && <span className="tnum text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{links.length}</span>}
         {editId === null && (
-          <button onClick={abrirNovo} className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5 shadow-[0_6px_18px_-6px_rgba(20,168,245,0.5)] active:scale-95 transition-transform">
+          <button onClick={abrirNovo} className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5 shadow-[0_6px_18px_-6px_rgba(20,168,245,0.5)] active:scale-95 transition-transform">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             Adicionar
           </button>
@@ -129,7 +129,7 @@ export default function Links() {
           <input value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} placeholder="Grupo (ex.: Pastas pra subir vídeo)" className={inputCls} />
           <div className="flex flex-wrap gap-1.5 mt-2">
             {sugestoesGrupo.map((g) => (
-              <button key={g} onClick={() => setFGrupo(g)} className={'text-[11.5px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (fGrupo === g ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>
+              <button key={g} onClick={() => setFGrupo(g)} className={'text-[12px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (fGrupo === g ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>
                 {g}
               </button>
             ))}
@@ -168,10 +168,10 @@ export default function Links() {
                 </span>
                 <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
                   <div className="text-[14px] font-semibold text-ink truncate group-hover:text-brand-2 transition-colors">{l.titulo}</div>
-                  <div className="text-[11.5px] text-muted truncate">{dominio(l.url)}</div>
+                  <div className="text-[12px] text-muted truncate">{dominio(l.url)}</div>
                 </a>
                 {confirmar === l.id ? (
-                  <span className="inline-flex items-center gap-1 text-[11.5px] shrink-0">
+                  <span className="inline-flex items-center gap-1 text-[12px] shrink-0">
                     <span className="text-muted">Apagar?</span>
                     <button onClick={() => remover(l.id)} className="font-bold text-red px-2 py-1 rounded-lg hover:bg-red hover:text-white transition-colors">Sim</button>
                     <button onClick={() => setConfirmar(null)} className="font-semibold text-muted px-2 py-1 rounded-lg hover:text-ink transition-colors">Não</button>

@@ -45,8 +45,8 @@ function FolderCard({ label, sub, onClick }: { label: string; sub: string; onCli
       <div className="aspect-video rounded-xl bg-surface-2 border border-border grid place-items-center mb-2 text-brand-2/70 group-hover:text-brand-2 transition-colors">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z" /></svg>
       </div>
-      <div className="text-[13.5px] font-bold truncate">{label}</div>
-      <div className="text-[11.5px] text-muted mt-0.5">{sub}</div>
+      <div className="text-[13px] font-bold truncate">{label}</div>
+      <div className="text-[12px] text-muted mt-0.5">{sub}</div>
     </button>
   )
 }
@@ -281,14 +281,14 @@ export default function Catalogo() {
             {marcado && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
           </span>
           {t && (
-            <span className={'absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold backdrop-blur-sm ' + TIPO_META[t].badge + (confirmado ? '' : ' opacity-90')}>
+            <span className={'absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold backdrop-blur-sm ' + TIPO_META[t].badge + (confirmado ? '' : ' opacity-90')}>
               {!confirmado && <span className="text-[8px] font-semibold opacity-70">IA</span>}
               {TIPO_META[t].label}
             </span>
           )}
         </div>
         <div className="text-[13px] font-bold truncate">{b.nome}</div>
-        <div className="text-[11.5px] text-muted tnum mt-0.5">{fmtDur(b.seg)}</div>
+        <div className="text-[12px] text-muted tnum mt-0.5">{fmtDur(b.seg)}</div>
       </button>
     )
   }
@@ -336,11 +336,11 @@ export default function Catalogo() {
               <button key={v} onClick={() => setFTipo(v)} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === v ? TIPO_META[v].badge : 'bg-surface-2 border-border text-muted hover:text-ink')}>{TIPO_META[v].label}</button>
             ))}
             <span className="w-px h-5 bg-border mx-0.5" />
-            <select value={fProduto} onChange={(e) => setFProduto(e.target.value)} className={'h-11 rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fProduto ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
+            <select value={fProduto} onChange={(e) => setFProduto(e.target.value)} className={'h-11 rounded-lg border bg-surface-2 px-2 text-[12px] outline-none cursor-pointer ' + (fProduto ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
               <option value="">Produto: todos</option>
               {produtosFiltro.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
-            <select value={fSemana} onChange={(e) => setFSemana(e.target.value)} className={'h-11 rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fSemana ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
+            <select value={fSemana} onChange={(e) => setFSemana(e.target.value)} className={'h-11 rounded-lg border bg-surface-2 px-2 text-[12px] outline-none cursor-pointer ' + (fSemana ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
               <option value="">Semana: todas</option>
               {semanasFiltro.map((s) => <option key={s} value={s}>{'Semana ' + s.slice(8, 10) + '/' + s.slice(5, 7)}</option>)}
             </select>
@@ -387,7 +387,7 @@ export default function Catalogo() {
       {sel.size > 0 && !aberto && (
         <div className="glass fixed bottom-0 left-0 right-0 z-40 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border/70">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
-            <span className="text-[13.5px] font-semibold">{sel.size} selecionado{sel.size > 1 ? 's' : ''}</span>
+            <span className="text-[13px] font-semibold">{sel.size} selecionado{sel.size > 1 ? 's' : ''}</span>
             <div className="flex-1" />
             <button onClick={() => setSel(new Set())} className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong transition-all">Limpar</button>
             <button
@@ -496,7 +496,7 @@ export default function Catalogo() {
               )}
             </div>
             {fonte === 'raw' && (
-              <div className="mt-2 flex items-center gap-1.5 text-[11.5px] text-muted">
+              <div className="mt-2 flex items-center gap-1.5 text-[12px] text-muted">
                 <div className="h-3.5 w-3.5 rounded-full border-2 border-border-strong border-t-brand animate-spin shrink-0" />
                 <span>Gerando versão leve com áudio… por ora, prévia 4K sem som (baixe para ouvir).</span>
               </div>
@@ -510,13 +510,13 @@ export default function Catalogo() {
                 <div className="mt-3 border-t border-border pt-3 shrink-0 max-h-[34vh] overflow-y-auto">
                   {temTransc && (
                     <div className="mb-2.5">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-muted mb-1">O que ele fala</div>
-                      <p className="text-[12.5px] text-ink-2 leading-snug max-h-24 overflow-auto whitespace-pre-wrap">{clA!.transcricao || '(silêncio / sem fala detectada)'}</p>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1">O que ele fala</div>
+                      <p className="text-[12px] text-ink-2 leading-snug max-h-24 overflow-auto whitespace-pre-wrap">{clA!.transcricao || '(silêncio / sem fala detectada)'}</p>
                     </div>
                   )}
                   {proposto && (
                     <div className="flex items-start gap-2 mb-2.5 text-[12px] text-muted">
-                      <span className={'shrink-0 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ' + TIPO_META[proposto].badge}>IA: {TIPO_META[proposto].label}</span>
+                      <span className={'shrink-0 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-bold ' + TIPO_META[proposto].badge}>IA: {TIPO_META[proposto].label}</span>
                       {clA?.ia_resumo && <span className="leading-snug">{clA.ia_resumo}</span>}
                     </div>
                   )}
@@ -542,15 +542,15 @@ export default function Catalogo() {
                   )}
 
                   <div className="mt-3 pt-3 border-t border-border">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Tarefa ligada</div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Tarefa ligada</div>
                     {(() => {
                       const cardId = clA?.card_id || null
                       const cardLig = cardId ? cards.find((c) => c.id === cardId) : null
                       if (cardLig) {
                         return (
                           <div className="flex items-center gap-2">
-                            {cardLig.copy && <span className="shrink-0 text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cardLig.copy}</span>}
-                            {cardLig.semRoteiro && <span className="shrink-0 text-[10.5px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
+                            {cardLig.copy && <span className="shrink-0 text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cardLig.copy}</span>}
+                            {cardLig.semRoteiro && <span className="shrink-0 text-[11px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
                             <span className="text-[13px] font-semibold truncate flex-1">{cardLig.titulo}</span>
                             <button onClick={desligar} className="shrink-0 text-[11px] text-muted hover:text-rose-300">Desligar</button>
                           </div>
@@ -566,22 +566,22 @@ export default function Catalogo() {
                           <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                             {filtradas.map((c) => (
                               <button key={c.id} disabled={ligando} onClick={() => ligar(c.id)} className="text-left flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-2 transition-colors disabled:opacity-50">
-                                <span className="shrink-0 text-[10px] font-bold text-brand-2 bg-brand/12 rounded-full px-1.5 py-0.5">{c.copy ?? (c.semRoteiro ? 'sem rot.' : '—')}</span>
-                                <span className="text-[12.5px] truncate">{c.titulo}</span>
+                                <span className="shrink-0 text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-1.5 py-0.5">{c.copy ?? (c.semRoteiro ? 'sem rot.' : '—')}</span>
+                                <span className="text-[12px] truncate">{c.titulo}</span>
                               </button>
                             ))}
-                            {filtradas.length === 0 && <div className="text-[11.5px] text-muted px-2 py-1">Nenhuma tarefa encontrada.</div>}
+                            {filtradas.length === 0 && <div className="text-[12px] text-muted px-2 py-1">Nenhuma tarefa encontrada.</div>}
                           </div>
                           <div className="border-t border-border pt-2">
-                            <div className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">Ou criar tarefa "Sem roteiro"</div>
+                            <div className="text-[11px] font-bold uppercase tracking-wide text-muted mb-1.5">Ou criar tarefa "Sem roteiro"</div>
                             <input value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)} placeholder="Título da gravação…" className="w-full h-9 px-3 rounded-lg bg-surface border border-border text-[13px] text-ink outline-none focus:border-brand/60 mb-2" />
                             <div className="flex flex-wrap gap-1.5 mb-2">
                               {CATEGORIAS.map((cat) => (
-                                <button key={cat} onClick={() => setNovaCat(cat)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCat === cat ? 'bg-brand border-brand text-white' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{cat}</button>
+                                <button key={cat} onClick={() => setNovaCat(cat)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCat === cat ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{cat}</button>
                               ))}
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-muted mr-0.5">Copy</span>
+                              <span className="text-[11px] font-bold uppercase tracking-wide text-muted mr-0.5">Copy</span>
                               {COPYS.map((c) => (
                                 <button key={c} onClick={() => setNovaCopy(novaCopy === c ? undefined : c)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCopy === c ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{c}</button>
                               ))}

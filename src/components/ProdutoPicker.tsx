@@ -56,7 +56,7 @@ export default function ProdutoPicker({ value, onChange }: { value?: string; onC
                 key={p}
                 type="button"
                 onClick={() => escolher(p)}
-                className={'text-[12.5px] font-bold rounded-lg px-2.5 py-1.5 border transition-all ' + corDoProduto(p) + (value === p ? ' ring-2 ring-inset ring-white/60' : ' hover:brightness-125')}
+                className={'text-[12px] font-bold rounded-lg px-2.5 py-1.5 border transition-all ' + corDoProduto(p) + (value === p ? ' ring-2 ring-inset ring-white/60' : ' hover:brightness-125')}
               >
                 {p}
               </button>
@@ -69,8 +69,9 @@ export default function ProdutoPicker({ value, onChange }: { value?: string; onC
             </button>
           )}
           {value && (
-            <button type="button" onClick={() => { onChange(''); setOpen(false); setBusca('') }} className="mt-2 w-full text-left text-[12.5px] font-semibold text-muted hover:text-rose-300 transition-colors px-1 py-1">
-              ✕ Remover produto
+            <button type="button" onClick={() => { onChange(''); setOpen(false); setBusca('') }} className="mt-2 w-full inline-flex items-center gap-1.5 text-[12px] font-semibold text-muted hover:text-rose-300 transition-colors px-1 py-1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              Remover produto
             </button>
           )}
         </div>

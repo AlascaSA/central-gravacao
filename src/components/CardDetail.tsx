@@ -121,7 +121,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               />
             ) : (
               <button onClick={() => { setTitTmp(tit); setEditTit(true) }} className="group/t flex items-start gap-1.5 text-left max-w-full" title="Renomear card">
-                <h3 className="text-[19px] font-black tracking-[-0.02em] leading-tight">{tit}</h3>
+                <h3 className="text-[18px] font-black tracking-[-0.02em] leading-tight">{tit}</h3>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-1.5 shrink-0 text-muted opacity-50 group-hover/t:opacity-100"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
               </button>
             )}
@@ -129,7 +129,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               {cp && <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cp}</span>}
               {semR && <span className="text-[11px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
               {card.campanha && <span className="text-[12px] text-muted">{card.campanha}</span>}
-              <span className={'text-[9.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + (urgColor[card.urgencia] ?? 'text-muted bg-surface-2')}>
+              <span className={'text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + (urgColor[card.urgencia] ?? 'text-muted bg-surface-2')}>
                 {card.urgencia}
               </span>
             </div>
@@ -184,7 +184,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               className="h-9 w-9 shrink-0 grid place-items-center rounded-lg bg-surface-2 border border-border text-muted hover:text-ink transition-colors text-[18px] leading-none"
               title="Semana anterior"
             >‹</button>
-            <div className="flex-1 text-center text-[13.5px] font-semibold text-ink bg-surface border border-border rounded-lg py-2 tnum">
+            <div className="flex-1 text-center text-[13px] font-semibold text-ink bg-surface border border-border rounded-lg py-2 tnum">
               {sem ? 'Semana ' + weekLabel(sem) : 'Sem semana'}
             </div>
             <button
@@ -246,7 +246,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                             : <svg width="14" height="14" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>}
                         </button>
                         <span className="text-[13px] font-semibold truncate flex-1">{b.nome || b.drive_id}</span>
-                        {t && <span className={'shrink-0 text-[10px] font-bold rounded-md px-1.5 py-0.5 ' + (TIPO_COR[t] ?? 'text-muted bg-surface-2')}>{t}</span>}
+                        {t && <span className={'shrink-0 text-[11px] font-bold rounded-md px-1.5 py-0.5 ' + (TIPO_COR[t] ?? 'text-muted bg-surface-2')}>{t}</span>}
                         <a href={baixarDe(b.drive_id, b.nome || 'video.mp4')} className="shrink-0 text-[11px] font-semibold text-brand-2 hover:text-brand">Baixar</a>
                         <button onClick={() => retirar(b.drive_id)} title="Retirar da tarefa" className="shrink-0 h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-rose-300 transition-colors">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -257,7 +257,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                         onChange={(e) => mudarComentTomada(b.drive_id, e.target.value)}
                         onBlur={(e) => comentarBruto(b.drive_id, e.target.value).catch(() => {})}
                         placeholder="Comentário da tomada…"
-                        className="w-full mt-2 h-8 px-2.5 rounded-lg bg-surface-2 border border-border text-[12.5px] text-ink-2 outline-none focus:border-brand/50 placeholder:text-muted"
+                        className="w-full mt-2 h-8 px-2.5 rounded-lg bg-surface-2 border border-border text-[12px] text-ink-2 outline-none focus:border-brand/50 placeholder:text-muted"
                       />
                       {tocando && (
                         <video src={proxyDe(b.drive_id)} controls autoPlay playsInline className="w-full mt-2 rounded-lg bg-black max-h-[40vh]" />
@@ -274,7 +274,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
           {card.observacoes ? (
             <div className="text-[15px] leading-relaxed whitespace-pre-wrap text-ink-2">{card.observacoes}</div>
           ) : (
-            <div className="text-[13.5px] text-muted">
+            <div className="text-[13px] text-muted">
               Sem roteiro escrito.{card.documentos.length ? ' Abra o documento acima pra ler.' : ''}
             </div>
           )}

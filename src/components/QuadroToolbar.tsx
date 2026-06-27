@@ -33,7 +33,7 @@ export default function QuadroToolbar({
   const base = ehSemana ? monday : currentMonday()
 
   const chip = (ativo: boolean) =>
-    'shrink-0 inline-flex items-center rounded-lg border px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors ' +
+    'shrink-0 inline-flex items-center rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ' +
     (ativo ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface/60 border-border text-ink-2 hover:border-border-strong hover:text-ink')
 
   const seta = 'h-9 w-9 grid place-items-center rounded-md text-muted hover:text-ink hover:bg-surface-2 transition-colors'
@@ -49,7 +49,7 @@ export default function QuadroToolbar({
           <button
             onClick={() => onChangeSemana(currentMonday(), 'semana')}
             title="Ir para a semana atual"
-            className={'px-1.5 min-w-[150px] text-center text-[12.5px] font-bold transition-colors ' + (ehSemana ? (ehAtual ? 'text-brand-2' : 'text-ink') : 'text-muted')}
+            className={'px-1.5 min-w-[150px] text-center text-[12px] font-bold transition-colors ' + (ehSemana ? (ehAtual ? 'text-brand-2' : 'text-ink') : 'text-muted')}
           >
             {ehSemana ? 'Semana ' + weekLabel(monday) + (ehAtual ? ' · hoje' : '') : 'Semana'}
           </button>
@@ -76,11 +76,11 @@ export default function QuadroToolbar({
 
         {/* ações (desktop) — no celular vão pra barra fixa inferior */}
         <div className="hidden sm:flex items-center gap-0.5 ml-auto pl-2 shrink-0">
-          <button onClick={onSubir} className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand-2 border border-brand/30 rounded-lg px-3 py-1.5 hover:bg-brand hover:text-white hover:border-brand transition-colors">
+          <button onClick={onSubir} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-brand-2 border border-brand/30 rounded-lg px-3 py-1.5 hover:bg-brand hover:text-white hover:border-brand transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16" /></svg>
             Subir roteiros
           </button>
-          <button onClick={onNovo} className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2 rounded-lg px-2.5 py-1.5 hover:bg-surface-2 hover:text-ink transition-colors">
+          <button onClick={onNovo} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-2 rounded-lg px-2.5 py-1.5 hover:bg-surface-2 hover:text-ink transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             Novo
           </button>
