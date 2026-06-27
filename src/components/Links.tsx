@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { listarLinks, criarLink, editarLink, deletarLink, type Link } from '../data/links'
 
 // sugestões iniciais de grupo (só atalho — nada é criado até ter um link)
-const SUGESTOES = ['Otimização de tarefas', 'Pastas pra subir vídeo']
+// categorias sugeridas (cada uma vira uma aba quando tiver link) — você cria novas digitando
+const SUGESTOES = ['Otimização de tarefas', 'Vídeos', 'Pastas pra subir vídeo', 'Planilhas', 'Geral']
 
 function comProtocolo(u: string): string {
   const t = u.trim()
@@ -58,6 +59,7 @@ export default function Links() {
   const [fGrupo, setFGrupo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [confirmar, setConfirmar] = useState<string | null>(null)
+  const [abaAtiva, setAbaAtiva] = useState<string>('')
 
   useEffect(() => {
     listarLinks().then(setLinks).catch(() => setLinks([]))
@@ -79,14 +81,19 @@ export default function Links() {
       if (!m.has(g)) m.set(g, [])
       m.get(g)!.push(l)
     }
-    return [...m.entries()]
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [links])
+
+  // cada grupo é uma ABA; mostra só a selecionada (sem scroll infinito de tudo)
+  const abas = agrupados.map(([g]) => g)
+  const abaEfetiva = abas.includes(abaAtiva) ? abaAtiva : abas[0] || ''
+  const grupoSel = agrupados.find(([g]) => g === abaEfetiva) || null
 
   function abrirNovo() {
     setEditId('')
     setFTitulo('')
     setFUrl('')
-    setFGrupo('')
+    setFGrupo(abaEfetiva) // já abre na aba/categoria atual
   }
   function abrirEdicao(l: Link) {
     setEditId(l.id)
@@ -158,6 +165,22 @@ export default function Links() {
         )}
       </div>
 
+      {/* abas — uma por categoria; mostra só a selecionada (sem scroll infinito) */}
+      {links && abas.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-border/60 mb-4">
+          {abas.map((g) => {
+            const ativo = g === abaEfetiva
+            const n = agrupados.find(([gg]) => gg === g)?.[1].length ?? 0
+            return (
+              <button key={g} onClick={() => setAbaAtiva(g)} className={'shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors ' + (ativo ? 'border-brand text-ink' : 'border-transparent text-muted hover:text-ink')}>
+                {g}
+                <span className={'tnum text-[11px] font-bold rounded-full px-1.5 ' + (ativo ? 'bg-brand/15 text-brand-2' : 'bg-surface-2 text-muted')}>{n}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* formulário (novo / edição) */}
       {editId !== null && (
         <div className="mb-5 rounded-2xl border border-border-strong bg-elev p-4">
@@ -191,15 +214,9 @@ export default function Links() {
         <div className="text-center text-muted py-16">Nenhum link ainda. Clique em "Adicionar" pra começar.</div>
       )}
 
-      {agrupados.map(([grupo, doGrupo]) => (
-        <section key={grupo} className="mb-6">
-          <div className="flex items-center gap-3 mb-2.5">
-            <h3 className="text-[12px] font-bold uppercase tracking-wide text-ink-2">{grupo}</h3>
-            <span className="text-[11px] font-bold text-muted bg-surface-2 rounded-full px-1.5">{doGrupo.length}</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-          <div className="flex flex-col gap-2">
-            {agruparPorProduto(doGrupo).map(([prod, links]) => {
+      {grupoSel && (
+        <div className="flex flex-col gap-2">
+          {agruparPorProduto(grupoSel[1]).map(([prod, links]) => {
               const temVar = links.some((l) => parseTitulo(l.titulo).variante)
               // sem variante (ex.: pasta avulsa): cada link como card simples
               if (!temVar) {
@@ -246,10 +263,9 @@ export default function Links() {
                   </div>
                 </div>
               )
-            })}
-          </div>
-        </section>
-      ))}
+          })}
+        </div>
+      )}
     </div>
   )
 }
