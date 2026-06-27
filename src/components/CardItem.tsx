@@ -77,6 +77,11 @@ export function CardView({
           <div className="text-[14.5px] font-bold leading-snug tracking-[-0.01em]">{card.titulo}</div>
           {card.campanha && <div className="text-[12px] text-muted mt-0.5">{card.campanha}</div>}
         </div>
+        {card.comentario?.trim() && (
+          <span title={card.comentario} aria-label="Tem aviso" className="shrink-0 grid place-items-center h-[18px] w-[18px] rounded-full bg-amber/15 text-amber">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+          </span>
+        )}
         <span className={'shrink-0 text-[9.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + urgColor[card.urgencia]}>
           {card.urgencia}
         </span>
