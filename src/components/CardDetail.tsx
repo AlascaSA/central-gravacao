@@ -6,6 +6,7 @@ import { store } from '../data/store'
 import { listarBrutosDoCard, ligarBruto, comentarBruto, type BrutoLigado } from '../data/catalogoBrutos'
 import { CAT_COR } from './CardItem'
 import ProdutoPicker from './ProdutoPicker'
+import { addWeeks, currentMonday, weekLabel } from '../week'
 
 const urgColor: Record<string, string> = {
   alta: 'text-red bg-red/15',
@@ -33,6 +34,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [editTit, setEditTit] = useState(false)
   const [titTmp, setTitTmp] = useState('')
   const [coment, setComent] = useState(card?.comentario || '')
+  const [sem, setSem] = useState<string | undefined>(card?.semana)
 
   useEffect(() => {
     setCat(card?.categoria)
@@ -40,6 +42,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     setTit(card?.titulo || '')
     setEditTit(false)
     setComent(card?.comentario || '')
+    setSem(card?.semana)
     setPlaying(null)
     if (card) listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
     else setLinked([])
@@ -54,6 +57,10 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   function trocarProd(p: string) {
     setProd(p)
     store.definirProduto(card!.id, p).catch(() => {})
+  }
+  function trocarSemana(nova: string | null) {
+    setSem(nova ?? undefined)
+    store.moverSemana(card!.id, nova).catch(() => {})
   }
   function retirar(drive_id: string) {
     setLinked((ls) => ls.filter((b) => b.drive_id !== drive_id))
@@ -125,6 +132,28 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                 {c}
               </button>
             ))}
+          </div>
+
+          <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Semana</div>
+          <div className="mb-4 flex items-center gap-1.5">
+            <button
+              onClick={() => trocarSemana(addWeeks(sem ?? currentMonday(), -1))}
+              className="h-9 w-9 shrink-0 grid place-items-center rounded-lg bg-surface-2 border border-border text-muted hover:text-ink transition-colors text-[18px] leading-none"
+              title="Semana anterior"
+            >‹</button>
+            <div className="flex-1 text-center text-[13.5px] font-semibold text-ink bg-surface border border-border rounded-lg py-2 tnum">
+              {sem ? 'Semana ' + weekLabel(sem) : 'Sem semana'}
+            </div>
+            <button
+              onClick={() => trocarSemana(addWeeks(sem ?? currentMonday(), 1))}
+              className="h-9 w-9 shrink-0 grid place-items-center rounded-lg bg-surface-2 border border-border text-muted hover:text-ink transition-colors text-[18px] leading-none"
+              title="Próxima semana"
+            >›</button>
+            {sem && (
+              <button onClick={() => trocarSemana(null)} className="shrink-0 text-[12px] font-medium text-muted hover:text-rose-300 transition-colors px-1.5" title="Tirar da semana">
+                tirar
+              </button>
+            )}
           </div>
 
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Produto</div>
