@@ -123,6 +123,16 @@ export function createSupabaseStore(): Store {
       return toCard(data as Row)
     },
 
+    async definirTitulo(id, titulo) {
+      const { data, error } = await sb
+        .from('cards')
+        .update({ titulo: titulo.trim(), atualizado_em: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      return toCard(data as Row)
+    },
     async definirCategoria(id, categoria) {
       const { data, error } = await sb
         .from('cards')

@@ -14,6 +14,8 @@ export interface Store {
   /** Move o card para outra semana (segunda-feira 'YYYY-MM-DD', ou null = sem semana). */
   moverSemana(id: string, semana: string | null): Promise<Card>
   archiveCard(id: string): Promise<Card>
+  /** Renomeia a tarefa (título do card). */
+  definirTitulo(id: string, titulo: string): Promise<Card>
   /** Define/troca a categoria da tarefa. */
   definirCategoria(id: string, categoria: Categoria): Promise<Card>
   /** Define/troca o produto da tarefa. */
@@ -94,6 +96,13 @@ export function createMockStore(): Store {
       }
       cards = [card, ...cards]
       return card
+    },
+    async definirTitulo(id, titulo) {
+      const c = cards.find((x) => x.id === id)
+      if (!c) throw new Error('Card não encontrado')
+      c.titulo = titulo.trim()
+      c.atualizadoEm = agora()
+      return { ...c }
     },
     async definirCategoria(id, categoria) {
       const c = cards.find((x) => x.id === id)

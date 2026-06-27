@@ -3,7 +3,7 @@ import type { Card, Categoria } from '../types'
 import { CATEGORIAS } from '../types'
 import { viewerUrl } from '../viewer'
 import { store } from '../data/store'
-import { listarBrutosDoCard, type BrutoLigado } from '../data/catalogoBrutos'
+import { listarBrutosDoCard, ligarBruto, type BrutoLigado } from '../data/catalogoBrutos'
 import { CAT_COR } from './CardItem'
 import ProdutoPicker from './ProdutoPicker'
 
@@ -29,10 +29,15 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [prod, setProd] = useState<string | undefined>(card?.produto)
   const [linked, setLinked] = useState<BrutoLigado[]>([])
   const [playing, setPlaying] = useState<string | null>(null)
+  const [tit, setTit] = useState(card?.titulo || '')
+  const [editTit, setEditTit] = useState(false)
+  const [titTmp, setTitTmp] = useState('')
 
   useEffect(() => {
     setCat(card?.categoria)
     setProd(card?.produto)
+    setTit(card?.titulo || '')
+    setEditTit(false)
     setPlaying(null)
     if (card) listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
     else setLinked([])
@@ -48,6 +53,19 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     setProd(p)
     store.definirProduto(card!.id, p).catch(() => {})
   }
+  function retirar(drive_id: string) {
+    setLinked((ls) => ls.filter((b) => b.drive_id !== drive_id))
+    if (playing === drive_id) setPlaying(null)
+    ligarBruto(drive_id, null).catch(() => {})
+  }
+  function salvarTitulo() {
+    const novo = titTmp.trim()
+    if (novo && novo !== tit) {
+      setTit(novo)
+      store.definirTitulo(card!.id, novo).catch(() => {})
+    }
+    setEditTit(false)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -57,7 +75,21 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
 
         <div className="flex items-start gap-3 shrink-0">
           <div className="min-w-0 flex-1">
-            <h3 className="text-[19px] font-black tracking-[-0.02em] leading-tight">{card.titulo}</h3>
+            {editTit ? (
+              <input
+                autoFocus
+                value={titTmp}
+                onChange={(e) => setTitTmp(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') salvarTitulo(); else if (e.key === 'Escape') setEditTit(false) }}
+                onBlur={salvarTitulo}
+                className="w-full text-[18px] font-black tracking-[-0.02em] leading-tight bg-surface border border-brand/60 rounded-lg px-2 py-1 outline-none text-ink"
+              />
+            ) : (
+              <button onClick={() => { setTitTmp(tit); setEditTit(true) }} className="group/t flex items-start gap-1.5 text-left max-w-full" title="Renomear card">
+                <h3 className="text-[19px] font-black tracking-[-0.02em] leading-tight">{tit}</h3>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-1.5 shrink-0 text-muted opacity-50 group-hover/t:opacity-100"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+              </button>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>
               {card.campanha && <span className="text-[12px] text-muted">{card.campanha}</span>}
@@ -126,6 +158,9 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                         <span className="text-[13px] font-semibold truncate flex-1">{b.nome || b.drive_id}</span>
                         {t && <span className={'shrink-0 text-[10px] font-bold rounded-md px-1.5 py-0.5 ' + (TIPO_COR[t] ?? 'text-muted bg-surface-2')}>{t}</span>}
                         <a href={baixarDe(b.drive_id, b.nome || 'video.mp4')} className="shrink-0 text-[11px] font-semibold text-brand-2 hover:text-brand">Baixar</a>
+                        <button onClick={() => retirar(b.drive_id)} title="Retirar da tarefa" className="shrink-0 h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-rose-300 transition-colors">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                        </button>
                       </div>
                       {tocando && (
                         <video src={proxyDe(b.drive_id)} controls autoPlay playsInline className="w-full mt-2 rounded-lg bg-black max-h-[40vh]" />

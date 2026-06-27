@@ -19,6 +19,13 @@ export function currentMonday(): string {
   return mondayOf(new Date())
 }
 
+/** Semana de produção de uma gravação: Seg–Qua ficam na semana da data; Qui–Dom vão pra próxima. */
+export function semanaDeGravacao(d: Date): string {
+  const base = mondayOf(d)
+  const dow = (d.getDay() + 6) % 7 // 0 = segunda ... 6 = domingo
+  return dow >= 3 ? addWeeks(base, 1) : base
+}
+
 export function addWeeks(monday: string, n: number): string {
   const [y, m, d] = monday.split('-').map(Number)
   const x = new Date(y, m - 1, d)

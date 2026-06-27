@@ -1,5 +1,6 @@
 import { driveToken, BRUTOS_FOLDER_ID } from './_google.js'
 
+const SUPA = process.env.VITE_SUPABASE_URL || 'https://kkvuioyferqbilfwdkqa.supabase.co'
 const bumpThumb = (link) => (link ? (/=s\d+/.test(link) ? link.replace(/=s\d+(-[a-z]+)?/, '=s640') : link + '=s640') : null)
 
 export default async function handler(req, res) {
@@ -21,7 +22,8 @@ export default async function handler(req, res) {
       seg: f.videoMediaMetadata && f.videoMediaMetadata.durationMillis
         ? Math.round(Number(f.videoMediaMetadata.durationMillis) / 1000)
         : null,
-      thumb: f.hasThumbnail ? bumpThumb(f.thumbnailLink) : null,
+      // capa: thumbnail do Drive; se o Drive não gerou (raro), usa o jpg derivado do proxy
+      thumb: f.hasThumbnail ? bumpThumb(f.thumbnailLink) : `${SUPA}/storage/v1/object/public/proxies/${f.id}.jpg`,
       criado: f.createdTime || f.modifiedTime || null,
     }))
     res.status(200).json({ videos })

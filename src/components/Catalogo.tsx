@@ -4,6 +4,7 @@ import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
 import { listarClassificacoes, confirmarTipo, ligarBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
 import { store } from '../data/store'
 import { CATEGORIAS, type Card, type Categoria } from '../types'
+import { semanaDeGravacao } from '../week'
 
 // proxy leve (1080p + áudio AAC, faststart) no Supabase Storage; quando existe, toca com som
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string
@@ -102,7 +103,9 @@ export default function Catalogo() {
     if (!t || ligando) return
     setLigando(true)
     try {
-      const card = await store.createCard({ copy: 'Sem roteiro', titulo: t, categoria: novaCat, fase: 'A editar' })
+      // a tarefa "Sem roteiro" cai na semana de produção do vídeo (Seg–Qua = semana da data; Qui–Dom = próxima)
+      const semana = aberto?.criado ? semanaDeGravacao(new Date(aberto.criado)) : undefined
+      const card = await store.createCard({ copy: 'Sem roteiro', titulo: t, categoria: novaCat, fase: 'A editar', semana })
       setCards((cs) => [card, ...cs])
       await ligar(card.id)
       setNovaTarefa('')
@@ -313,7 +316,7 @@ export default function Catalogo() {
               >
                 <div className="relative aspect-video rounded-xl bg-surface-2 border border-border overflow-hidden mb-2 grid place-items-center text-muted">
                   <svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
-                  {b.thumb && <img src={b.thumb} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}
+                  {b.thumb && <img src={b.thumb} alt="" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} className="absolute inset-0 h-full w-full object-cover" />}
                   <span className="absolute inset-0 grid place-items-center bg-black/0 group-hover:bg-black/25 transition-colors">
                     <span className="h-9 w-9 rounded-full bg-black/0 group-hover:bg-black/55 backdrop-blur-sm grid place-items-center opacity-0 group-hover:opacity-100 transition-all">
                       <svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white" /></svg>

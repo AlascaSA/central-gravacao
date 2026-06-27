@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import type { Card, Urgencia } from '../types'
 import { viewerUrl } from '../viewer'
+import { corDoProduto } from '../produtoCor'
 
 const urgColor: Record<Urgencia, string> = {
   alta: 'text-red bg-red/15',
@@ -84,7 +85,7 @@ export function CardView({
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <span className="text-[10.5px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>
         {card.categoria && <span className={'text-[10.5px] font-bold rounded-full px-2 py-0.5 ' + (CAT_COR[card.categoria] ?? 'text-muted bg-surface-2')}>{card.categoria}</span>}
-        {card.produto && <span className="text-[10.5px] font-semibold text-ink-2 bg-surface-2 border border-border rounded-full px-2 py-0.5 max-w-[140px] truncate">{card.produto}</span>}
+        {card.produto && <span className={'text-[10.5px] font-bold border rounded-full px-2 py-0.5 max-w-[150px] truncate ' + corDoProduto(card.produto)}>{card.produto}</span>}
         {card.prazo && <span className="text-[10.5px] text-muted tnum">⏱ {card.prazo}</span>}
       </div>
 

@@ -95,6 +95,24 @@ function transcodificar(src, out, vKbps) {
   })
 }
 
+// capa (jpg 640px) derivada do proxy — fallback caso o Drive não gere thumbnail do vídeo
+function extrairFrame(src, jpg) {
+  return new Promise((res, rej) => {
+    const p = spawn('ffmpeg', ['-y', '-ss', '1', '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', jpg], { stdio: ['ignore', 'ignore', 'ignore'] })
+    p.on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg thumb ' + c))))
+    p.on('error', rej)
+  })
+}
+async function gerarCapa(id, proxyFile) {
+  const jpg = proxyFile + '.jpg'
+  try {
+    await extrairFrame(proxyFile, jpg)
+    await fetch(`${SUPA}/storage/v1/object/${BUCKET}/${id}.jpg`, { method: 'POST', headers: { Authorization: 'Bearer ' + SECRET, apikey: SECRET, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' }, body: fs.readFileSync(jpg) })
+  } finally {
+    fs.rmSync(jpg, { force: true })
+  }
+}
+
 async function subir(id, file) {
   const buf = fs.readFileSync(file)
   const r = await fetch(`${SUPA}/storage/v1/object/${BUCKET}/${id}.mp4`, {
@@ -119,6 +137,7 @@ async function processar(f) {
     await transcodificar(src, out, vKbps)
     process.stdout.write(' subindo…')
     const tam = await subir(f.id, out)
+    await gerarCapa(f.id, out).catch(() => {})
     console.log(` OK ${mb(tam)}`)
   } catch (e) {
     console.log(` ERRO: ${e.message}`)

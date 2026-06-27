@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { store } from '../data/store'
+import { corDoProduto } from '../produtoCor'
 
 // Seletor de produto: mostra os produtos salvos (chips) e deixa digitar um novo pra salvar.
 // Começa vazio; a lista cresce conforme você adiciona.
@@ -55,7 +56,7 @@ export default function ProdutoPicker({ value, onChange }: { value?: string; onC
                 key={p}
                 type="button"
                 onClick={() => escolher(p)}
-                className={'text-[12.5px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (value === p ? 'bg-brand border-brand text-white' : 'bg-surface-2 border-border text-ink-2 hover:border-brand/50')}
+                className={'text-[12.5px] font-bold rounded-lg px-2.5 py-1.5 border transition-all ' + corDoProduto(p) + (value === p ? ' ring-2 ring-white/50' : ' hover:brightness-125')}
               >
                 {p}
               </button>
