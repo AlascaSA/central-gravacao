@@ -202,7 +202,7 @@ export default function Links() {
               <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(l.url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
                 {ehPasta(l.url) ? <IconePasta /> : <IconeLink />}
               </span>
-              <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
+              <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" title={l.titulo} className="min-w-0 flex-1">
                 <div className="text-[14px] font-semibold text-ink truncate group-hover:text-brand-2 transition-colors">{l.titulo}</div>
                 <div className="text-[12px] text-muted truncate">{dominio(l.url)}</div>
               </a>
