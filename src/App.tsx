@@ -6,6 +6,7 @@ import Filters, { type FiltroCopy } from './components/Filters'
 import Board from './components/Board'
 import Archive from './components/Archive'
 import Catalogo from './components/Catalogo'
+import Links from './components/Links'
 import NewCardModal from './components/NewCardModal'
 import UploadModal from './components/UploadModal'
 import CardDetail from './components/CardDetail'
@@ -171,6 +172,8 @@ export default function App() {
         <Board cards={ativosFiltrados} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
       ) : vista === 'catalogo' ? (
         <Catalogo />
+      ) : vista === 'links' ? (
+        <Links />
       ) : (
         <Archive cards={arquivados} />
       )}

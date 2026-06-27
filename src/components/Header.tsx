@@ -1,6 +1,6 @@
-export type Vista = 'quadro' | 'arquivo' | 'catalogo'
+export type Vista = 'quadro' | 'arquivo' | 'catalogo' | 'links'
 
-const LABEL: Record<Vista, string> = { quadro: 'Quadro', arquivo: 'Arquivo', catalogo: 'Catálogo' }
+const LABEL: Record<Vista, string> = { quadro: 'Quadro', arquivo: 'Arquivo', catalogo: 'Catálogo', links: 'Links' }
 
 export default function Header({ vista, onVista }: { vista: Vista; onVista: (v: Vista) => void }) {
   return (
