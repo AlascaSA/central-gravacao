@@ -12,7 +12,7 @@
   /* texto */
   --color-ink: #f4f6fa;
   --color-ink-2: #c7cedb;
-  --color-muted: #8b95a6;
+  --color-muted: #9aa7ba;
   /* marca Alasca + semânticos */
   --color-brand: #14a8f5;
   --color-brand-2: #5cc4ff;
@@ -54,6 +54,10 @@ body::before {
 
 /* números tabulares pra contadores não dançarem */
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* expande a área de toque de botões-ícone pequenos pra ~44px sem mudar o visual */
+.tap { position: relative; }
+.tap::before { content: ''; position: absolute; inset: -8px; }
 
 /* vidro pra header/barras */
 .glass {

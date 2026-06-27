@@ -52,6 +52,13 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     else setLinked([])
   }, [card?.id])
 
+  useEffect(() => {
+    if (!card) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [card, onClose])
+
   if (!card) return null
 
   function trocarCat(c: Categoria) {

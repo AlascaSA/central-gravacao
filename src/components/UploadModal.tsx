@@ -43,6 +43,13 @@ export default function UploadModal({
     }
   }, [open, copyDefault])
 
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !rodando) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, rodando, onClose])
+
   if (!open) return null
 
   async function processar() {

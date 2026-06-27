@@ -177,11 +177,11 @@ export default function Links() {
                     <button onClick={() => setConfirmar(null)} className="font-semibold text-muted px-2 py-1 rounded-lg hover:text-ink transition-colors">Não</button>
                   </span>
                 ) : (
-                  <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => abrirEdicao(l)} title="Editar" className="h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-ink transition-colors">
+                  <div className="shrink-0 flex items-center gap-0.5 opacity-60 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <button onClick={() => abrirEdicao(l)} title="Editar" aria-label={'Editar link ' + l.titulo} className="tap h-8 w-8 grid place-items-center rounded-lg text-muted hover:text-ink transition-colors">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                     </button>
-                    <button onClick={() => setConfirmar(l.id)} title="Apagar" className="h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-red transition-colors">
+                    <button onClick={() => setConfirmar(l.id)} title="Apagar" aria-label={'Apagar link ' + l.titulo} className="tap h-8 w-8 grid place-items-center rounded-lg text-muted hover:text-red transition-colors">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg>
                     </button>
                   </div>

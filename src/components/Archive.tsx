@@ -14,7 +14,7 @@ function rotuloMes(ym: string): string {
 }
 
 const selCls = (ativo: boolean) =>
-  'h-[34px] rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' +
+  'h-11 rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' +
   (ativo ? 'border-brand/50 text-ink' : 'border-border text-muted')
 
 export default function Archive({ cards }: { cards: Card[] }) {
@@ -64,7 +64,7 @@ export default function Archive({ cards }: { cards: Card[] }) {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar…"
-            className="h-[34px] w-40 rounded-lg border border-border bg-surface-2 pl-8 pr-2 text-[12.5px] text-ink outline-none focus:border-brand/50 placeholder:text-muted"
+            className="h-11 w-40 rounded-lg border border-border bg-surface-2 pl-8 pr-2 text-[12.5px] text-ink outline-none focus:border-brand/50 placeholder:text-muted"
           />
         </div>
         {produtos.length > 0 && (

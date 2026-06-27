@@ -277,7 +277,7 @@ export default function Catalogo() {
               <svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white" /></svg>
             </span>
           </span>
-          <span role="checkbox" aria-checked={marcado} onClick={(e) => { e.stopPropagation(); toggleSel(b.id) }} className={'absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' + (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-0 group-hover:opacity-100 ' + (sel.size > 0 ? 'opacity-70' : ''))}>
+          <span role="checkbox" aria-checked={marcado} aria-label="Selecionar vídeo" onClick={(e) => { e.stopPropagation(); toggleSel(b.id) }} className={'tap absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' + (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-50 group-hover:opacity-100')}>
             {marcado && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
           </span>
           {t && (
@@ -336,11 +336,11 @@ export default function Catalogo() {
               <button key={v} onClick={() => setFTipo(v)} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === v ? TIPO_META[v].badge : 'bg-surface-2 border-border text-muted hover:text-ink')}>{TIPO_META[v].label}</button>
             ))}
             <span className="w-px h-5 bg-border mx-0.5" />
-            <select value={fProduto} onChange={(e) => setFProduto(e.target.value)} className={'h-[34px] rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fProduto ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
+            <select value={fProduto} onChange={(e) => setFProduto(e.target.value)} className={'h-11 rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fProduto ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
               <option value="">Produto: todos</option>
               {produtosFiltro.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
-            <select value={fSemana} onChange={(e) => setFSemana(e.target.value)} className={'h-[34px] rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fSemana ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
+            <select value={fSemana} onChange={(e) => setFSemana(e.target.value)} className={'h-11 rounded-lg border bg-surface-2 px-2 text-[12.5px] outline-none cursor-pointer ' + (fSemana ? 'border-brand/50 text-ink' : 'border-border text-muted')}>
               <option value="">Semana: todas</option>
               {semanasFiltro.map((s) => <option key={s} value={s}>{'Semana ' + s.slice(8, 10) + '/' + s.slice(5, 7)}</option>)}
             </select>

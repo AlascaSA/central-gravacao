@@ -162,7 +162,7 @@ export function CardView({
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); setConfirmar(true) }}
-                className="h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-red transition-colors"
+                className="tap h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-red transition-colors"
                 title="Apagar card"
                 aria-label="Apagar card"
               >
