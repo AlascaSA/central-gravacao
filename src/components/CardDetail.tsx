@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { Card, Categoria } from '../types'
-import { CATEGORIAS } from '../types'
+import type { Card, Categoria, Copy } from '../types'
+import { CATEGORIAS, COPYS } from '../types'
 import { viewerUrl } from '../viewer'
 import { store } from '../data/store'
 import { listarBrutosDoCard, ligarBruto, comentarBruto, type BrutoLigado } from '../data/catalogoBrutos'
@@ -35,6 +35,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [titTmp, setTitTmp] = useState('')
   const [coment, setComent] = useState(card?.comentario || '')
   const [sem, setSem] = useState<string | undefined>(card?.semana)
+  const [cp, setCp] = useState<Copy | undefined>(card?.copy)
 
   useEffect(() => {
     setCat(card?.categoria)
@@ -43,6 +44,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     setEditTit(false)
     setComent(card?.comentario || '')
     setSem(card?.semana)
+    setCp(card?.copy)
     setPlaying(null)
     if (card) listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
     else setLinked([])
@@ -61,6 +63,10 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   function trocarSemana(nova: string | null) {
     setSem(nova ?? undefined)
     store.moverSemana(card!.id, nova).catch(() => {})
+  }
+  function trocarCopy(c: Copy) {
+    setCp(c)
+    store.definirCopy(card!.id, c).catch(() => {})
   }
   function retirar(drive_id: string) {
     setLinked((ls) => ls.filter((b) => b.drive_id !== drive_id))
@@ -106,7 +112,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               </button>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{card.copy}</span>
+              <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cp}</span>
               {card.campanha && <span className="text-[12px] text-muted">{card.campanha}</span>}
               <span className={'text-[9.5px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + (urgColor[card.urgencia] ?? 'text-muted bg-surface-2')}>
                 {card.urgencia}
@@ -120,6 +126,20 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
 
         {/* corpo rolável */}
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+          {/* copy (responsável) */}
+          <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Copy</div>
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {COPYS.map((c) => (
+              <button
+                key={c}
+                onClick={() => trocarCopy(c)}
+                className={'text-[12px] font-semibold rounded-lg border px-2.5 py-1 transition-colors ' + (cp === c ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
           {/* categoria */}
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Categoria</div>
           <div className="flex flex-wrap gap-1.5 mb-4">

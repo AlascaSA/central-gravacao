@@ -1,4 +1,4 @@
-import type { Card, Categoria, Doc, Fase, NovoCard } from '../types'
+import type { Card, Categoria, Copy, Doc, Fase, NovoCard } from '../types'
 import { currentMonday } from '../week'
 import { hasSupabase } from './supabase'
 import { createSupabaseStore } from './supabaseStore'
@@ -20,6 +20,8 @@ export interface Store {
   definirComentario(id: string, comentario: string): Promise<Card>
   /** Define/troca a categoria da tarefa. */
   definirCategoria(id: string, categoria: Categoria): Promise<Card>
+  /** Define/troca a copy (responsável) da tarefa. */
+  definirCopy(id: string, copy: Copy): Promise<Card>
   /** Define/troca o produto da tarefa. */
   definirProduto(id: string, produto: string): Promise<Card>
   /** Lista de produtos salvos (pra escolher no upload). */
@@ -117,6 +119,13 @@ export function createMockStore(): Store {
       const c = cards.find((x) => x.id === id)
       if (!c) throw new Error('Card não encontrado')
       c.categoria = categoria
+      c.atualizadoEm = agora()
+      return { ...c }
+    },
+    async definirCopy(id, copy) {
+      const c = cards.find((x) => x.id === id)
+      if (!c) throw new Error('Card não encontrado')
+      c.copy = copy
       c.atualizadoEm = agora()
       return { ...c }
     },
