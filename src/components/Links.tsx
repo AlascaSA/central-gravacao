@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { listarLinks, criarLink, editarLink, deletarLink, type Link } from '../data/links'
+import { listarLinks, criarLink, editarLink, deletarLink, type Link, type NovoLink } from '../data/links'
 
 // sugestões iniciais de grupo (só atalho — nada é criado até ter um link)
 // categorias sugeridas (cada uma vira uma aba quando tiver link) — você cria novas digitando
@@ -116,17 +116,26 @@ export default function Links() {
   }
 
   async function salvar() {
-    const titulo = montarTitulo(fProduto, fNome)
+    const novoProd = fProduto.trim()
     const url = comProtocolo(fUrl)
-    if (!fProduto.trim() || !url || salvando) return
+    const grupo = fGrupo.trim() || null
+    if (!novoProd || !url || salvando) return
     setSalvando(true)
     try {
-      const payload = { titulo, url, grupo: fGrupo.trim() || null }
       if (editId) {
-        await editarLink(editId, payload)
-        setLinks((ls) => (ls ? ls.map((l) => (l.id === editId ? { ...l, ...payload } : l)) : ls))
+        const editado = (links || []).find((l) => l.id === editId)
+        const prodAntigo = editado ? parseTitulo(editado.titulo).prod : novoProd
+        const grupoAntigo = editado?.grupo?.trim() || null
+        // irmãos = mesmo produto + mesma categoria (Vendas/Remarketing do mesmo produto)
+        const irmaos = (links || []).filter((l) => l.id !== editId && parseTitulo(l.titulo).prod === prodAntigo && (l.grupo?.trim() || null) === grupoAntigo)
+        const ups = new Map<string, NovoLink>()
+        ups.set(editId, { titulo: montarTitulo(novoProd, fNome), url, grupo }) // o link editado
+        // renomear/mover o produto propaga pros irmãos (cada um mantém o próprio nome)
+        for (const l of irmaos) ups.set(l.id, { titulo: montarTitulo(novoProd, parseTitulo(l.titulo).variante || ''), url: l.url, grupo })
+        for (const [id, payload] of ups) await editarLink(id, payload)
+        setLinks((ls) => (ls ? ls.map((l) => (ups.has(l.id) ? { ...l, ...ups.get(l.id)! } : l)) : ls))
       } else {
-        const novo = await criarLink(payload)
+        const novo = await criarLink({ titulo: montarTitulo(novoProd, fNome), url, grupo })
         if (novo) setLinks((ls) => [...(ls || []), novo])
       }
       fechar()
