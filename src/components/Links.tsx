@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { listarLinks, criarLink, editarLink, deletarLink, type Link } from '../data/links'
 
 // sugestões iniciais de grupo (só atalho — nada é criado até ter um link)
@@ -21,6 +21,29 @@ function ehPasta(u: string): boolean {
   return /drive\.google\.com\/drive|drive\.google\.com\/folders/i.test(u)
 }
 
+// título guardado = "Produto — Nome do link". Aqui separamos os dois pra exibir/editar.
+function parseTitulo(t: string): { prod: string; variante: string | null } {
+  const m = t.match(/^(.+?)\s+[—–-]\s+(.+)$/)
+  return m ? { prod: m[1].trim(), variante: m[2].trim() } : { prod: t.trim(), variante: null }
+}
+function montarTitulo(prod: string, nome: string): string {
+  const p = prod.trim()
+  const n = nome.trim()
+  return n ? p + ' — ' + n : p
+}
+function agruparPorProduto(links: Link[]): [string, Link[]][] {
+  const m = new Map<string, Link[]>()
+  for (const l of links) {
+    const { prod } = parseTitulo(l.titulo)
+    if (!m.has(prod)) m.set(prod, [])
+    m.get(prod)!.push(l)
+  }
+  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+}
+function IconeAbrir() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M7 17 17 7M9 7h8v8" /></svg>
+}
+
 function IconePasta() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" /></svg>
@@ -35,7 +58,8 @@ function IconeLink() {
 export default function Links() {
   const [links, setLinks] = useState<Link[] | null>(null)
   const [editId, setEditId] = useState<string | null>(null) // null = nada; '' = novo; uuid = editando
-  const [fTitulo, setFTitulo] = useState('')
+  const [fProduto, setFProduto] = useState('') // nome em destaque (agrupa)
+  const [fNome, setFNome] = useState('') // nome do link (Vendas/Remarketing) — opcional
   const [fUrl, setFUrl] = useState('')
   const [fGrupo, setFGrupo] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -69,16 +93,21 @@ export default function Links() {
   const abas = agrupados.map(([g]) => g)
   const abaEfetiva = abas.includes(abaAtiva) ? abaAtiva : abas[0] || ''
   const grupoSel = agrupados.find(([g]) => g === abaEfetiva) || null
+  // produtos já existentes na aba atual — sugestões pra agrupar o novo link no mesmo
+  const produtosDoGrupo = grupoSel ? [...new Set(grupoSel[1].map((l) => parseTitulo(l.titulo).prod))].sort((a, b) => a.localeCompare(b)) : []
 
   function abrirNovo() {
     setEditId('')
-    setFTitulo('')
+    setFProduto('')
+    setFNome('')
     setFUrl('')
     setFGrupo(abaEfetiva) // já abre na aba/categoria atual
   }
   function abrirEdicao(l: Link) {
+    const { prod, variante } = parseTitulo(l.titulo)
     setEditId(l.id)
-    setFTitulo(l.titulo)
+    setFProduto(prod)
+    setFNome(variante || '')
     setFUrl(l.url)
     setFGrupo(l.grupo || '')
   }
@@ -87,9 +116,9 @@ export default function Links() {
   }
 
   async function salvar() {
-    const titulo = fTitulo.trim()
+    const titulo = montarTitulo(fProduto, fNome)
     const url = comProtocolo(fUrl)
-    if (!titulo || !url || salvando) return
+    if (!fProduto.trim() || !url || salvando) return
     setSalvando(true)
     try {
       const payload = { titulo, url, grupo: fGrupo.trim() || null }
@@ -166,9 +195,19 @@ export default function Links() {
       {editId !== null && (
         <div className="mb-5 rounded-2xl border border-border-strong bg-elev p-4">
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-2.5">{editId ? 'Editar link' : 'Novo link'}</div>
-          <input value={fTitulo} onChange={(e) => setFTitulo(e.target.value)} placeholder="Nome (ex.: Pasta de brutos — Junho)" className={inputCls + ' mb-2'} autoFocus />
+          <label className="block text-[11px] font-semibold text-muted mb-1">Produto (destaque)</label>
+          <input value={fProduto} onChange={(e) => setFProduto(e.target.value)} placeholder="Ex.: PERP-JL-POS-DFP" className={inputCls + ' mb-1.5'} autoFocus />
+          {produtosDoGrupo.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {produtosDoGrupo.map((p) => (
+                <button key={p} onClick={() => setFProduto(p)} className={'text-[12px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (fProduto === p ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{p}</button>
+              ))}
+            </div>
+          )}
+          <label className="block text-[11px] font-semibold text-muted mb-1">Nome do link <span className="font-normal text-muted/70">(ex.: Vendas, Remarketing — opcional)</span></label>
+          <input value={fNome} onChange={(e) => setFNome(e.target.value)} placeholder="Vendas" className={inputCls + ' mb-2'} />
           <input value={fUrl} onChange={(e) => setFUrl(e.target.value)} placeholder="Cole o link (https://…)" className={inputCls + ' mb-2'} />
-          <input value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} placeholder="Grupo (ex.: Pastas pra subir vídeo)" className={inputCls} />
+          <input value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} placeholder="Categoria / aba (ex.: Otimização de tarefas)" className={inputCls} />
           <div className="flex flex-wrap gap-1.5 mt-2">
             {sugestoesGrupo.map((g) => (
               <button key={g} onClick={() => setFGrupo(g)} className={'text-[12px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (fGrupo === g ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>
@@ -178,7 +217,7 @@ export default function Links() {
           </div>
           <div className="flex items-center gap-2 mt-3.5">
             <button onClick={fechar} className="text-[13px] font-semibold text-muted px-3 py-2 hover:text-ink transition-colors">Cancelar</button>
-            <button onClick={salvar} disabled={!fTitulo.trim() || !fUrl.trim() || salvando} className="ml-auto text-[13px] font-bold text-white bg-brand rounded-xl px-4 py-2 disabled:opacity-40 active:scale-[0.98] transition-all">
+            <button onClick={salvar} disabled={!fProduto.trim() || !fUrl.trim() || salvando} className="ml-auto text-[13px] font-bold text-white bg-brand rounded-xl px-4 py-2 disabled:opacity-40 active:scale-[0.98] transition-all">
               {salvando ? 'Salvando…' : editId ? 'Salvar' : 'Adicionar link'}
             </button>
           </div>
@@ -196,19 +235,55 @@ export default function Links() {
       )}
 
       {grupoSel && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {[...grupoSel[1]].sort((a, b) => a.titulo.localeCompare(b.titulo)).map((l) => (
-            <div key={l.id} className="group rounded-xl border border-border bg-surface hover:border-border-strong transition-colors flex items-center gap-3 pl-3.5 pr-2.5 py-2.5">
-              <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(l.url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
-                {ehPasta(l.url) ? <IconePasta /> : <IconeLink />}
-              </span>
-              <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" title={l.titulo} className="min-w-0 flex-1">
-                <div className="text-[14px] font-semibold text-ink truncate group-hover:text-brand-2 transition-colors">{l.titulo}</div>
-                <div className="text-[12px] text-muted truncate">{dominio(l.url)}</div>
-              </a>
-              {acoesLink(l)}
-            </div>
-          ))}
+        <div className="flex flex-col gap-2">
+          {agruparPorProduto(grupoSel[1]).map(([prod, links]) => {
+            const temVar = links.some((l) => parseTitulo(l.titulo).variante)
+            // sem nome de link: cada um como card simples (título inteiro)
+            if (!temVar) {
+              return (
+                <Fragment key={prod}>
+                  {links.map((l) => (
+                    <div key={l.id} className="group rounded-xl border border-border bg-surface hover:border-border-strong transition-colors flex items-center gap-3 pl-3.5 pr-2.5 py-2.5">
+                      <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(l.url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
+                        {ehPasta(l.url) ? <IconePasta /> : <IconeLink />}
+                      </span>
+                      <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" title={l.titulo} className="min-w-0 flex-1">
+                        <div className="text-[14px] font-semibold text-ink truncate group-hover:text-brand-2 transition-colors">{l.titulo}</div>
+                        <div className="text-[12px] text-muted truncate">{dominio(l.url)}</div>
+                      </a>
+                      {acoesLink(l)}
+                    </div>
+                  ))}
+                </Fragment>
+              )
+            }
+            // com nome de link: produto em destaque uma vez, com os nomes (Vendas/Remarketing) dentro
+            return (
+              <div key={prod} className="rounded-xl border border-border bg-surface overflow-hidden">
+                <div className="flex items-center gap-2.5 px-3.5 pt-2.5 pb-2">
+                  <span className={'shrink-0 grid place-items-center h-8 w-8 rounded-lg border ' + (ehPasta(links[0].url) ? 'text-amber bg-amber/12 border-amber/25' : 'text-brand-2 bg-brand/10 border-brand/20')}>
+                    {ehPasta(links[0].url) ? <IconePasta /> : <IconeLink />}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[14px] font-bold text-ink truncate" title={prod}>{prod}</span>
+                  <span className="shrink-0 text-[11px] text-muted truncate max-w-[120px]">{dominio(links[0].url)}</span>
+                </div>
+                <div className="border-t border-border/60">
+                  {links
+                    .slice()
+                    .sort((a, b) => (parseTitulo(a.titulo).variante || '').localeCompare(parseTitulo(b.titulo).variante || ''))
+                    .map((l) => (
+                      <div key={l.id} className="group flex items-center gap-2 pl-3.5 pr-2.5 py-1.5 border-b border-border/40 last:border-0 hover:bg-surface-2/40 transition-colors">
+                        <a href={comProtocolo(l.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 inline-flex items-center gap-1.5 text-[13px] text-ink-2 hover:text-brand-2 truncate transition-colors">
+                          <IconeAbrir />
+                          <span className="truncate">{parseTitulo(l.titulo).variante}</span>
+                        </a>
+                        {acoesLink(l)}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
