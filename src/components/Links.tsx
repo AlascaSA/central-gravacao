@@ -23,7 +23,9 @@ function ehPasta(u: string): boolean {
 
 // título guardado = "Produto — Nome do link". Aqui separamos os dois pra exibir/editar.
 function parseTitulo(t: string): { prod: string; variante: string | null } {
-  const m = t.match(/^(.+?)\s+[—–-]\s+(.+)$/)
+  // quebra no ÚLTIMO separador (grupo guloso) — assim hífens no nome do produto
+  // ("PPC - Prática Civil — Vendas") ficam no produto e só "Vendas" vira o nome do link
+  const m = t.match(/^(.+)\s+[—–-]\s+(.+)$/)
   return m ? { prod: m[1].trim(), variante: m[2].trim() } : { prod: t.trim(), variante: null }
 }
 function montarTitulo(prod: string, nome: string): string {
