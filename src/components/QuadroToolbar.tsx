@@ -16,6 +16,8 @@ export default function QuadroToolbar({
   filtro,
   onChangeFiltro,
   counts,
+  selMode,
+  onToggleSel,
   onSubir,
   onNovo,
 }: {
@@ -25,6 +27,8 @@ export default function QuadroToolbar({
   filtro: FiltroCopy
   onChangeFiltro: (v: FiltroCopy) => void
   counts: Record<string, number>
+  selMode: boolean
+  onToggleSel: () => void
   onSubir: () => void
   onNovo: () => void
 }) {
@@ -73,6 +77,25 @@ export default function QuadroToolbar({
             </button>
           )
         })}
+
+        <span className="shrink-0 w-px h-6 bg-border mx-1.5" />
+
+        {/* modo seleção pra baixar vídeos em lote (some o checkbox do card até ligar aqui) */}
+        <button
+          onClick={onToggleSel}
+          title="Selecionar cards pra baixar os vídeos em lote"
+          className={
+            'shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ' +
+            (selMode ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface/60 border-border text-ink-2 hover:border-border-strong hover:text-ink')
+          }
+        >
+          {selMode ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="4" /><path d="m8 12 3 3 5-6" /></svg>
+          )}
+          {selMode ? 'Cancelar' : 'Selecionar'}
+        </button>
 
         {/* ações (desktop) — no celular vão pra barra fixa inferior */}
         <div className="hidden sm:flex items-center gap-0.5 ml-auto pl-2 shrink-0">

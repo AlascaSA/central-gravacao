@@ -76,7 +76,9 @@ export function CardView({
       ref={dragRef}
       {...(dragProps ?? {})}
       onClick={() => {
-        if (onOpen && !overlay) onOpen(card)
+        if (overlay) return
+        if (onToggleSel) onToggleSel(card.id)
+        else if (onOpen) onOpen(card)
       }}
       style={index != null && !overlay ? { animationDelay: `${Math.min(index * 45, 320)}ms` } : undefined}
       className={base + interactive + stateCls + (selecionado && !overlay ? 'ring-2 ring-brand/50 ' : '')}

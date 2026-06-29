@@ -16,6 +16,7 @@ import { CardView } from './CardItem'
 
 export default function Board({
   cards,
+  selMode,
   onMove,
   onArchive,
   onPushSemana,
@@ -23,6 +24,7 @@ export default function Board({
   onOpen,
 }: {
   cards: Card[]
+  selMode?: boolean
   onMove: (id: string, fase: Fase) => void
   onArchive: (id: string) => void
   onPushSemana?: (id: string) => void
@@ -70,6 +72,27 @@ export default function Board({
     }
   }, [activeId])
 
+  // roda do mouse comum (só eixo Y) move o quadro na horizontal quando a coluna
+  // sob o ponteiro não tem mais o que rolar na vertical — padrão Kanban (Trello)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0 || e.shiftKey) return
+      const lista = (e.target as Element | null)?.closest?.('[data-col-scroll]') as HTMLElement | null
+      if (lista) {
+        const podeDescer = e.deltaY > 0 && lista.scrollTop + lista.clientHeight < lista.scrollHeight - 1
+        const podeSubir = e.deltaY < 0 && lista.scrollTop > 0
+        if (podeDescer || podeSubir) return // deixa a coluna rolar na vertical
+      }
+      if (el.scrollWidth <= el.clientWidth) return
+      el.scrollLeft += e.deltaY
+      e.preventDefault()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
   const activeCard = activeId ? cards.find((c) => c.id === activeId) ?? null : null
   const naJaylton = cards.filter((c) => c.fase === 'para Jaylton gravar').length
   function scrollToFim() {
@@ -89,6 +112,10 @@ export default function Board({
       return n
     })
   }
+  // ao desligar o modo seleção, zera o que estava marcado
+  useEffect(() => {
+    if (!selMode) setSel(new Set())
+  }, [selMode])
   async function baixarVideos() {
     if (sel.size === 0 || baixando) return
     setBaixando(true)
@@ -139,23 +166,27 @@ export default function Board({
       <div className="relative z-10 h-full">
         <div
           ref={scrollRef}
-          className={'flex items-start gap-3.5 h-full overflow-auto px-4 sm:px-6 pt-4 pb-24 sm:pb-6 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
+          className={'flex gap-3.5 h-full overflow-x-auto px-4 sm:px-6 pt-4 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
         >
           {FASES.map((fase) => (
-            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={toggleSel} />
+            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={selMode ? toggleSel : undefined} />
           ))}
         </div>
 
         {naJaylton > 0 && !activeId && (
           <button
             onClick={scrollToFim}
-            title="Ir para a coluna do Jaylton"
-            className="absolute top-3 right-4 sm:right-6 z-20 inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-surface/95 backdrop-blur px-3 py-1.5 text-[12px] font-semibold text-ink-2 shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] hover:text-ink hover:border-[#94a3b8] transition-colors"
+            title="para Jaylton gravar — ir para a coluna"
+            className="group absolute top-3 right-4 sm:right-6 z-20 inline-flex items-center rounded-full border border-border-strong bg-surface/95 backdrop-blur px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] hover:text-ink hover:border-[#94a3b8] transition-colors"
           >
             <span className="h-2 w-2 rounded-full shrink-0" style={{ background: '#94a3b8' }} />
-            para Jaylton gravar
-            <span className="tnum text-[11px] font-bold bg-surface-3 rounded-full px-1.5">{naJaylton}</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-[grid-template-columns] duration-300 ease-out">
+              <span className="overflow-hidden">
+                <span className="pl-1.5 whitespace-nowrap">para Jaylton gravar</span>
+              </span>
+            </span>
+            <span className="tnum ml-1.5 shrink-0 text-[11px] font-bold bg-surface-3 rounded-full px-1.5">{naJaylton}</span>
+            <svg className="ml-1.5 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </button>
         )}
       </div>
@@ -168,13 +199,17 @@ export default function Board({
         ) : null}
       </DragOverlay>
 
-      {sel.size > 0 && !activeId && (
+      {selMode && !activeId && (
         <div className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-border/70 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
-            <span className="text-[13px] font-semibold">{sel.size} card{sel.size > 1 ? 's' : ''} selecionado{sel.size > 1 ? 's' : ''}</span>
+            <span className="text-[13px] font-semibold">
+              {sel.size === 0 ? 'Toque nos cards para baixar os vídeos' : `${sel.size} card${sel.size > 1 ? 's' : ''} selecionado${sel.size > 1 ? 's' : ''}`}
+            </span>
             <div className="flex-1" />
-            <button onClick={() => setSel(new Set())} className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong transition-all">Limpar</button>
-            <button onClick={baixarVideos} disabled={baixando} className="h-11 px-5 inline-flex items-center gap-2 rounded-xl bg-brand text-white font-bold text-[14px] shadow-[0_10px_30px_-6px_rgba(20,168,245,0.5)] active:scale-[0.98] transition-transform disabled:opacity-70">
+            {sel.size > 0 && (
+              <button onClick={() => setSel(new Set())} className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong transition-all">Limpar</button>
+            )}
+            <button onClick={baixarVideos} disabled={baixando || sel.size === 0} className="h-11 px-5 inline-flex items-center gap-2 rounded-xl bg-brand text-white font-bold text-[14px] shadow-[0_10px_30px_-6px_rgba(20,168,245,0.5)] active:scale-[0.98] transition-transform disabled:opacity-50">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6" /><path d="M4 20h16" /></svg>
               {baixMsg || 'Baixar vídeos'}
             </button>

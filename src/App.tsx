@@ -23,6 +23,7 @@ export default function App() {
   const [semMonday, setSemMonday] = useState(currentMonday())
   const [vistaSem, setVistaSem] = useState<VistaSemana>('semana')
   const [detailCard, setDetailCard] = useState<Card | null>(null)
+  const [selMode, setSelMode] = useState(false)
   const sigRef = useRef('')
   const abriuLinkRef = useRef(false)
   // exclusões com "Desfazer": some da tela na hora, efetiva no banco depois de 5s
@@ -189,6 +190,8 @@ export default function App() {
           filtro={filtro}
           onChangeFiltro={setFiltro}
           counts={counts}
+          selMode={selMode}
+          onToggleSel={() => setSelMode((v) => !v)}
           onSubir={() => setUploadOpen(true)}
           onNovo={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? undefined : filtro)}
         />
@@ -200,7 +203,7 @@ export default function App() {
         </div>
       ) : vista === 'quadro' ? (
         <div className="flex-1 min-h-0">
-          <Board cards={ativosFiltrados} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
+          <Board cards={ativosFiltrados} selMode={selMode} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
