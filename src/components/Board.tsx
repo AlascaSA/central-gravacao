@@ -104,9 +104,8 @@ export default function Board({
     for (let k = 0; k < brutos.length; k++) {
       setBaixMsg(`Baixando ${k + 1}/${brutos.length}…`)
       const a = document.createElement('a')
-      // direto do Google Drive (logado), em nova aba pra não tirar o usuário do app
-      a.href = `https://drive.usercontent.google.com/download?id=${brutos[k].drive_id}&export=download&confirm=t`
-      a.target = '_blank'
+      // worker de download (link assinado): baixa direto como attachment, sem abrir abas nem aviso
+      a.href = `/api/download-url?id=${brutos[k].drive_id}&name=${encodeURIComponent(brutos[k].nome || 'video.mp4')}`
       a.rel = 'noopener'
       document.body.appendChild(a)
       a.click()
