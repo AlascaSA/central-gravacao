@@ -104,8 +104,9 @@ export default function Board({
     for (let k = 0; k < brutos.length; k++) {
       setBaixMsg(`Baixando ${k + 1}/${brutos.length}…`)
       const a = document.createElement('a')
-      // direto do Google Drive (logado), sem passar pelo Vercel
+      // direto do Google Drive (logado), em nova aba pra não tirar o usuário do app
       a.href = `https://drive.usercontent.google.com/download?id=${brutos[k].drive_id}&export=download&confirm=t`
+      a.target = '_blank'
       a.rel = 'noopener'
       document.body.appendChild(a)
       a.click()

@@ -315,7 +315,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                         <button onClick={() => copiar(driveLink(b.drive_id), b.drive_id)} title="Copiar link do vídeo no Drive (pra colar no ClickUp)" className={'shrink-0 text-[11px] font-semibold ' + (copiado === b.drive_id ? 'text-green' : 'text-muted hover:text-ink')}>
                           {copiado === b.drive_id ? 'copiado' : 'link Drive'}
                         </button>
-                        <a href={baixarDe(b.drive_id)} className="shrink-0 text-[11px] font-semibold text-brand-2 hover:text-brand">Baixar</a>
+                        <a href={baixarDe(b.drive_id)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[11px] font-semibold text-brand-2 hover:text-brand">Baixar</a>
                         <button onClick={() => retirar(b.drive_id)} title="Retirar da tarefa" className="shrink-0 h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-rose-300 transition-colors">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                         </button>

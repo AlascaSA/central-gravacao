@@ -456,7 +456,7 @@ export default function Catalogo() {
                 </>
               ) : (
                 <>
-                  <a href={baixarUrl(aberto)} className="shrink-0 text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">Baixar</a>
+                  <a href={baixarUrl(aberto)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">Baixar</a>
                   <button onClick={() => setIdx(null)} aria-label="Fechar" className="shrink-0 h-9 w-9 grid place-items-center rounded-xl bg-surface-2 border border-border text-muted hover:text-ink transition-colors">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                   </button>
@@ -508,7 +508,7 @@ export default function Catalogo() {
                   <div>
                     <div className="text-[13px] font-semibold text-white mb-1">Não consegui carregar o vídeo</div>
                     <div className="text-[12px] text-white/70 mb-3">Tente baixar para assistir.</div>
-                    <a href={baixarUrl(aberto)} className="inline-block text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5">Baixar vídeo</a>
+                    <a href={baixarUrl(aberto)} target="_blank" rel="noopener noreferrer" className="inline-block text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5">Baixar vídeo</a>
                   </div>
                 </div>
               )}
