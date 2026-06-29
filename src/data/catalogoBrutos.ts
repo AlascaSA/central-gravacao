@@ -51,6 +51,13 @@ export async function listarBrutosDoCard(card_id: string): Promise<BrutoLigado[]
   return (data as BrutoLigado[]) || []
 }
 
+// Brutos ligados a VÁRIOS cards (pra baixar em lote).
+export async function listarBrutosDeCards(cardIds: string[]): Promise<{ drive_id: string; nome: string | null; card_id: string }[]> {
+  if (!supabase || cardIds.length === 0) return []
+  const { data } = await supabase.from('brutos').select('drive_id,nome,card_id').in('card_id', cardIds)
+  return (data as { drive_id: string; nome: string | null; card_id: string }[]) || []
+}
+
 // Comentário numa tomada (bruto).
 export async function comentarBruto(drive_id: string, comentario: string): Promise<void> {
   if (!supabase) return

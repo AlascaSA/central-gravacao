@@ -10,6 +10,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { FASES, type Card, type Fase } from '../types'
+import { listarBrutosDeCards } from '../data/catalogoBrutos'
 import Column from './Column'
 import { CardView } from './CardItem'
 
@@ -76,6 +77,42 @@ export default function Board({
     if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' })
   }
 
+  // seleção de cards p/ baixar os vídeos ligados em lote
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [baixando, setBaixando] = useState(false)
+  const [baixMsg, setBaixMsg] = useState('')
+  function toggleSel(id: string) {
+    setSel((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  }
+  async function baixarVideos() {
+    if (sel.size === 0 || baixando) return
+    setBaixando(true)
+    setBaixMsg('buscando vídeos…')
+    const brutos = await listarBrutosDeCards([...sel])
+    if (brutos.length === 0) {
+      setBaixMsg('Nenhum vídeo ligado nesses cards')
+      setTimeout(() => { setBaixando(false); setBaixMsg('') }, 2500)
+      return
+    }
+    for (let k = 0; k < brutos.length; k++) {
+      setBaixMsg(`Baixando ${k + 1}/${brutos.length}…`)
+      const a = document.createElement('a')
+      a.href = `/api/bruto-video?id=${brutos[k].drive_id}&download=1&nome=${encodeURIComponent(brutos[k].nome || 'video.mp4')}`
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      await new Promise((r) => setTimeout(r, 1200))
+    }
+    setBaixando(false)
+    setBaixMsg('')
+  }
+
   function onDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id))
   }
@@ -105,7 +142,7 @@ export default function Board({
           className={'flex gap-3.5 h-full overflow-x-auto px-4 sm:px-6 pt-4 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
         >
           {FASES.map((fase) => (
-            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} />
+            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={toggleSel} />
           ))}
         </div>
 
@@ -130,6 +167,20 @@ export default function Board({
           </div>
         ) : null}
       </DragOverlay>
+
+      {sel.size > 0 && !activeId && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-border/70 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+          <div className="max-w-2xl mx-auto flex items-center gap-3">
+            <span className="text-[13px] font-semibold">{sel.size} card{sel.size > 1 ? 's' : ''} selecionado{sel.size > 1 ? 's' : ''}</span>
+            <div className="flex-1" />
+            <button onClick={() => setSel(new Set())} className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong transition-all">Limpar</button>
+            <button onClick={baixarVideos} disabled={baixando} className="h-11 px-5 inline-flex items-center gap-2 rounded-xl bg-brand text-white font-bold text-[14px] shadow-[0_10px_30px_-6px_rgba(20,168,245,0.5)] active:scale-[0.98] transition-transform disabled:opacity-70">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6" /><path d="M4 20h16" /></svg>
+              {baixMsg || 'Baixar vídeos'}
+            </button>
+          </div>
+        </div>
+      )}
     </DndContext>
   )
 }

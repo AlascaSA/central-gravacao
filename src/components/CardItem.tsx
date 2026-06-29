@@ -44,6 +44,8 @@ export function CardView({
   index,
   dragRef,
   dragProps,
+  selecionado,
+  onToggleSel,
 }: {
   card: Card
   onArchive: (id: string) => void
@@ -55,6 +57,8 @@ export function CardView({
   index?: number
   dragRef?: (el: HTMLElement | null) => void
   dragProps?: Record<string, unknown>
+  selecionado?: boolean
+  onToggleSel?: (id: string) => void
 }) {
   const podeConcluir = card.fase === 'Finalizado' || card.fase === 'No tráfego'
   const [confirmar, setConfirmar] = useState(false)
@@ -75,7 +79,7 @@ export function CardView({
         if (onOpen && !overlay) onOpen(card)
       }}
       style={index != null && !overlay ? { animationDelay: `${Math.min(index * 45, 320)}ms` } : undefined}
-      className={base + interactive + stateCls}
+      className={base + interactive + stateCls + (selecionado && !overlay ? 'ring-2 ring-brand/50 ' : '')}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
@@ -134,8 +138,19 @@ export function CardView({
         </div>
       )}
 
-      {(onPushSemana || podeConcluir || onDelete) && (
+      {(onPushSemana || podeConcluir || onDelete || onToggleSel) && (
         <div className="mt-3 flex items-center gap-2">
+          {onToggleSel && !overlay && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onToggleSel(card.id) }}
+              title="Selecionar pra baixar os vídeos"
+              aria-label="Selecionar card"
+              className={'tap shrink-0 grid place-items-center h-5 w-5 rounded-md border transition-colors ' + (selecionado ? 'bg-brand border-brand text-white' : 'border-border-strong text-transparent hover:border-brand')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            </button>
+          )}
           {onPushSemana && !overlay && (
             <button
               onPointerDown={(e) => e.stopPropagation()}
@@ -208,6 +223,8 @@ export default function DraggableCard({
   onDelete,
   onOpen,
   index,
+  selecionado,
+  onToggleSel,
 }: {
   card: Card
   onArchive: (id: string) => void
@@ -215,6 +232,8 @@ export default function DraggableCard({
   onDelete?: (id: string) => void
   onOpen?: (card: Card) => void
   index?: number
+  selecionado?: boolean
+  onToggleSel?: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id })
   return (
@@ -228,6 +247,8 @@ export default function DraggableCard({
       index={index}
       dragRef={setNodeRef}
       dragProps={{ ...attributes, ...listeners }}
+      selecionado={selecionado}
+      onToggleSel={onToggleSel}
     />
   )
 }

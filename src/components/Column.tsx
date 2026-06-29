@@ -20,6 +20,8 @@ export default function Column({
   onPushSemana,
   onDelete,
   onOpen,
+  selecionados,
+  onToggleSel,
 }: {
   fase: Fase
   cards: Card[]
@@ -28,6 +30,8 @@ export default function Column({
   onPushSemana?: (id: string) => void
   onDelete?: (id: string) => void
   onOpen?: (card: Card) => void
+  selecionados?: Set<string>
+  onToggleSel?: (id: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: fase })
   const cor = FASE_COR[fase]
@@ -51,7 +55,7 @@ export default function Column({
           ? arrastando && (
               <div className="grid place-items-center text-[12px] text-muted py-9 rounded-xl border border-dashed border-brand/40">solte aqui</div>
             )
-          : cards.map((card, i) => <DraggableCard key={card.id} card={card} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} index={i} />)}
+          : cards.map((card, i) => <DraggableCard key={card.id} card={card} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} index={i} selecionado={selecionados?.has(card.id)} onToggleSel={onToggleSel} />)}
       </div>
     </section>
   )
