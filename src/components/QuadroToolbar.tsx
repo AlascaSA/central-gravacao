@@ -54,7 +54,7 @@ export default function QuadroToolbar({
     (ativo ? 'bg-brand/12 text-brand-2' : 'text-ink-2 hover:bg-surface-2')
 
   return (
-    <div className="relative z-10 shrink-0 border-b border-border/60 bg-surface/30">
+    <div className="relative z-20 shrink-0 border-b border-border/60 bg-surface/30">
       <div className="flex items-center gap-1.5 px-4 sm:px-6 py-2.5">
         {/* período: controle fixo (fora da área que rola, pro menu não ser cortado) */}
         <div className={'relative shrink-0 flex items-center rounded-lg border p-0.5 bg-surface ' + (ehSemana ? 'border-brand/40' : 'border-border')}>
