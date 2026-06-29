@@ -1,0 +1,21 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # libs com requires dinâmicos: enviadas como estão, sem empacotar
+  external_node_modules = ["mammoth", "pdf-parse", "google-auth-library"]
+
+# /api/* → funções (mantém o frontend chamando /api/... sem mudança)
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA: qualquer rota cai no index (roteamento no cliente)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
