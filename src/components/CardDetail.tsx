@@ -25,6 +25,17 @@ const TIPO_COR: Record<string, string> = {
   complemento: 'text-amber-300 bg-amber-500/15',
 }
 
+// transforma URLs do texto em links clicáveis (mantém o resto como texto)
+function linkificar(texto: string) {
+  return texto.split(/(https?:\/\/[^\s]+)/g).map((p, i) =>
+    /^https?:\/\//.test(p) ? (
+      <a key={i} href={p} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-brand-2 hover:text-brand underline break-all">{p}</a>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
+  )
+}
+
 export default function CardDetail({ card, onClose }: { card: Card | null; onClose: () => void }) {
   const [cat, setCat] = useState<Categoria | undefined>(card?.categoria)
   const [prod, setProd] = useState<string | undefined>(card?.produto)
@@ -34,6 +45,8 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [editTit, setEditTit] = useState(false)
   const [titTmp, setTitTmp] = useState('')
   const [coment, setComent] = useState(card?.comentario || '')
+  const [editComent, setEditComent] = useState(false)
+  const [editTomada, setEditTomada] = useState<string | null>(null) // drive_id da tomada em edição
   const [sem, setSem] = useState<string | undefined>(card?.semana)
   const [cp, setCp] = useState<Copy | undefined>(card?.copy)
   const [semR, setSemR] = useState<boolean>(!!card?.semRoteiro)
@@ -55,6 +68,8 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     setTit(card?.titulo || '')
     setEditTit(false)
     setComent(card?.comentario || '')
+    setEditComent(false)
+    setEditTomada(null)
     setSem(card?.semana)
     setCp(card?.copy)
     setSemR(!!card?.semRoteiro)
@@ -240,14 +255,25 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
           <div className="mb-4"><ProdutoPicker value={prod} onChange={trocarProd} /></div>
 
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Comentário</div>
-          <textarea
-            value={coment}
-            onChange={(e) => setComent(e.target.value)}
-            onBlur={salvarComentario}
-            placeholder="Anotação sobre a tarefa…"
-            rows={2}
-            className="w-full mb-4 px-3 py-2 rounded-xl bg-surface border border-border text-[14px] text-ink outline-none focus:border-brand/60 resize-none placeholder:text-muted"
-          />
+          {editComent ? (
+            <textarea
+              value={coment}
+              onChange={(e) => setComent(e.target.value)}
+              onBlur={() => { salvarComentario(); setEditComent(false) }}
+              placeholder="Anotação sobre a tarefa… (links viram clicáveis)"
+              rows={2}
+              autoFocus
+              className="w-full mb-4 px-3 py-2 rounded-xl bg-surface border border-brand/60 text-[14px] text-ink outline-none resize-none placeholder:text-muted"
+            />
+          ) : (
+            <div
+              onClick={() => setEditComent(true)}
+              title="Clique pra editar"
+              className="w-full mb-4 px-3 py-2 rounded-xl bg-surface border border-border text-[14px] text-ink min-h-[44px] cursor-text whitespace-pre-wrap break-words hover:border-border-strong transition-colors"
+            >
+              {coment.trim() ? linkificar(coment) : <span className="text-muted">Anotação sobre a tarefa…</span>}
+            </div>
+          )}
 
           {card.documentos.length > 0 && (
             <div className="flex flex-col gap-2 mb-4">
@@ -292,13 +318,20 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                         </button>
                       </div>
-                      <input
-                        value={b.comentario || ''}
-                        onChange={(e) => mudarComentTomada(b.drive_id, e.target.value)}
-                        onBlur={(e) => comentarBruto(b.drive_id, e.target.value).then(marcarSalvo, marcarErro)}
-                        placeholder="Comentário da tomada…"
-                        className="w-full mt-2 h-8 px-2.5 rounded-lg bg-surface-2 border border-border text-[12px] text-ink-2 outline-none focus:border-brand/50 placeholder:text-muted"
-                      />
+                      {editTomada === b.drive_id ? (
+                        <input
+                          value={b.comentario || ''}
+                          onChange={(e) => mudarComentTomada(b.drive_id, e.target.value)}
+                          onBlur={(e) => { comentarBruto(b.drive_id, e.target.value).then(marcarSalvo, marcarErro); setEditTomada(null) }}
+                          placeholder="Comentário da tomada…"
+                          autoFocus
+                          className="w-full mt-2 h-8 px-2.5 rounded-lg bg-surface-2 border border-brand/50 text-[12px] text-ink-2 outline-none placeholder:text-muted"
+                        />
+                      ) : (
+                        <div onClick={() => setEditTomada(b.drive_id)} title="Clique pra editar" className="w-full mt-2 min-h-8 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-[12px] text-ink-2 cursor-text whitespace-pre-wrap break-words hover:border-border-strong transition-colors">
+                          {(b.comentario || '').trim() ? linkificar(b.comentario || '') : <span className="text-muted">Comentário da tomada…</span>}
+                        </div>
+                      )}
                       {tocando && (
                         <video src={proxyDe(b.drive_id)} controls autoPlay playsInline className="w-full mt-2 rounded-lg bg-black max-h-[40vh]" />
                       )}
