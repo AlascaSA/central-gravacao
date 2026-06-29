@@ -9,7 +9,10 @@ import { semanaDeGravacao } from '../week'
 // proxy leve (1080p + áudio AAC, faststart) no Supabase Storage; quando existe, toca com som
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string
 const proxyDe = (id: string) => `${SUPA}/storage/v1/object/public/proxies/${id}.mp4`
-const baixarUrl = (b: Bruto) => `/api/bruto-video?id=${b.id}&download=1&nome=${encodeURIComponent(b.nome)}`
+// download e prévia 4K vêm DIRETO do Google Drive (não passam pelo Vercel — sem gasto de banda).
+// o time é membro do Shared Drive, então acessa logado na conta Google.
+const baixarUrl = (b: Bruto) => `https://drive.usercontent.google.com/download?id=${b.id}&export=download&confirm=t`
+const drivePreview = (id: string) => `https://drive.google.com/file/d/${id}/preview`
 
 const TIPOS: TipoBruto[] = ['boa', 'erro', 'gancho', 'complemento']
 const TIPO_META: Record<TipoBruto, { label: string; badge: string; dot: string; btn: string }> = {
@@ -465,14 +468,12 @@ export default function Catalogo() {
                 <div className="w-full h-full grid place-items-center rounded-xl bg-black">
                   <div className="h-8 w-8 rounded-full border-[3px] border-white/25 border-t-white animate-spin" />
                 </div>
-              ) : (
+              ) : fonte === 'proxy' ? (
                 <video
-                  key={aberto.id + fonte}
-                  ref={(el) => { if (el) el.muted = fonte !== 'proxy' }}
-                  src={fonte === 'proxy' ? proxyDe(aberto.id) : `/api/bruto-video?id=${aberto.id}`}
+                  key={aberto.id}
+                  src={proxyDe(aberto.id)}
                   poster={aberto.thumb || undefined}
                   controls
-                  muted={fonte !== 'proxy'}
                   autoPlay
                   playsInline
                   preload="metadata"
@@ -483,12 +484,22 @@ export default function Catalogo() {
                   onWaiting={() => setBuff(true)}
                   onError={() => setVidErro(true)}
                 />
+              ) : (
+                // 4K bruto: toca direto do Drive (logado), sem passar pelo Vercel
+                <iframe
+                  key={aberto.id}
+                  src={drivePreview(aberto.id)}
+                  title={aberto.nome}
+                  allow="autoplay; fullscreen"
+                  allowFullScreen
+                  className="w-full h-full rounded-xl bg-black border-0"
+                />
               )}
-              {fonte !== 'checando' && !vidErro && (!pronto || buff) && (
+              {fonte === 'proxy' && !vidErro && (!pronto || buff) && (
                 <div className="absolute inset-0 grid place-items-center rounded-xl bg-black/45 pointer-events-none">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 rounded-full border-[3px] border-white/25 border-t-white animate-spin" />
-                    <span className="text-[12px] font-medium text-white/85">{pronto ? 'Bufferizando…' : fonte === 'raw' ? 'Carregando 4K…' : 'Carregando…'}</span>
+                    <span className="text-[12px] font-medium text-white/85">{pronto ? 'Bufferizando…' : 'Carregando…'}</span>
                   </div>
                 </div>
               )}
@@ -511,7 +522,7 @@ export default function Catalogo() {
             {fonte === 'raw' && (
               <div className="mt-2 flex items-center gap-1.5 text-[12px] text-muted">
                 <div className="h-3.5 w-3.5 rounded-full border-2 border-border-strong border-t-brand animate-spin shrink-0" />
-                <span>Gerando versão leve com áudio… por ora, prévia 4K sem som (baixe para ouvir).</span>
+                <span>Tocando o 4K direto do Drive enquanto a versão leve é gerada.</span>
               </div>
             )}
             {(() => {
