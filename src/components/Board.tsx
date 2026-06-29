@@ -88,6 +88,40 @@ export default function Board({
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
+  // arrastar o fundo do quadro pra rolar (igual Trello/Figma) — ignora cards,
+  // botões e links pra não atrapalhar o arraste de card nem os cliques
+  const pan = useRef<{ x: number; y: number; l: number; t: number } | null>(null)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const down = (e: PointerEvent) => {
+      if (e.button !== 0) return
+      const t = e.target as Element | null
+      if (t?.closest('[data-card], button, a, input, textarea, select')) return
+      pan.current = { x: e.clientX, y: e.clientY, l: el.scrollLeft, t: el.scrollTop }
+      el.classList.add('cursor-grabbing')
+    }
+    const move = (e: PointerEvent) => {
+      const p = pan.current
+      if (!p) return
+      el.scrollLeft = p.l - (e.clientX - p.x)
+      el.scrollTop = p.t - (e.clientY - p.y)
+    }
+    const up = () => {
+      if (!pan.current) return
+      pan.current = null
+      el.classList.remove('cursor-grabbing')
+    }
+    el.addEventListener('pointerdown', down)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      el.removeEventListener('pointerdown', down)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+  }, [])
+
   const activeCard = activeId ? cards.find((c) => c.id === activeId) ?? null : null
   const naJaylton = cards.filter((c) => c.fase === 'para Jaylton gravar').length
   function scrollToFim() {
@@ -161,7 +195,7 @@ export default function Board({
       <div className="relative z-10 h-full">
         <div
           ref={scrollRef}
-          className={'scroll-quadro flex items-start gap-5 sm:gap-6 h-full overflow-auto px-4 sm:px-6 pt-4 pb-24 sm:pb-6 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
+          className={'scroll-quadro cursor-grab flex items-start gap-5 sm:gap-6 h-full overflow-auto px-4 sm:px-6 pt-4 pb-24 sm:pb-6 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
         >
           {FASES.map((fase) => (
             <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={selMode ? toggleSel : undefined} />
