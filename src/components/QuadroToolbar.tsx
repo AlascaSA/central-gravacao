@@ -18,6 +18,8 @@ export default function QuadroToolbar({
   counts,
   selMode,
   onToggleSel,
+  jaylton,
+  onJaylton,
   onSubir,
   onNovo,
 }: {
@@ -29,6 +31,8 @@ export default function QuadroToolbar({
   counts: Record<string, number>
   selMode: boolean
   onToggleSel: () => void
+  jaylton: number
+  onJaylton: () => void
   onSubir: () => void
   onNovo: () => void
 }) {
@@ -79,6 +83,20 @@ export default function QuadroToolbar({
         })}
 
         <span className="shrink-0 w-px h-6 bg-border mx-1.5" />
+
+        {/* indicador + atalho pra coluna do Jaylton (sai de cima do quadro) */}
+        {jaylton > 0 && (
+          <button
+            onClick={onJaylton}
+            title="Ir para a coluna do Jaylton"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface/60 px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 hover:border-[#94a3b8] hover:text-ink transition-colors"
+          >
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: '#94a3b8' }} />
+            para Jaylton gravar
+            <span className="tnum text-[11px] font-bold bg-surface-3 rounded-full px-1.5">{jaylton}</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+        )}
 
         {/* modo seleção pra baixar vídeos em lote (some o checkbox do card até ligar aqui) */}
         <button

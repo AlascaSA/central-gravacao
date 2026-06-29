@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -17,6 +17,7 @@ import { CardView } from './CardItem'
 export default function Board({
   cards,
   selMode,
+  scrollRef,
   onMove,
   onArchive,
   onPushSemana,
@@ -25,6 +26,7 @@ export default function Board({
 }: {
   cards: Card[]
   selMode?: boolean
+  scrollRef: RefObject<HTMLDivElement | null>
   onMove: (id: string, fase: Fase) => void
   onArchive: (id: string) => void
   onPushSemana?: (id: string) => void
@@ -32,7 +34,6 @@ export default function Board({
   onOpen?: (card: Card) => void
 }) {
   const [activeId, setActiveId] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const ponteiro = useRef<{ x: number } | null>(null)
 
   const sensors = useSensors(
@@ -73,11 +74,6 @@ export default function Board({
   }, [activeId])
 
   const activeCard = activeId ? cards.find((c) => c.id === activeId) ?? null : null
-  const naJaylton = cards.filter((c) => c.fase === 'para Jaylton gravar').length
-  function scrollToFim() {
-    const el = scrollRef.current
-    if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' })
-  }
 
   // seleção de cards p/ baixar os vídeos ligados em lote
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -151,23 +147,6 @@ export default function Board({
             <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={selMode ? toggleSel : undefined} />
           ))}
         </div>
-
-        {naJaylton > 0 && !activeId && (
-          <button
-            onClick={scrollToFim}
-            title="para Jaylton gravar — ir para a coluna"
-            className="group absolute top-3 right-4 sm:right-6 z-20 inline-flex items-center rounded-full border border-border-strong bg-surface/95 backdrop-blur px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] hover:text-ink hover:border-[#94a3b8] transition-colors"
-          >
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: '#94a3b8' }} />
-            <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-[grid-template-columns] duration-300 ease-out">
-              <span className="overflow-hidden">
-                <span className="pl-1.5 whitespace-nowrap">para Jaylton gravar</span>
-              </span>
-            </span>
-            <span className="tnum ml-1.5 shrink-0 text-[11px] font-bold bg-surface-3 rounded-full px-1.5">{naJaylton}</span>
-            <svg className="ml-1.5 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-          </button>
-        )}
       </div>
 
       <DragOverlay dropAnimation={null}>

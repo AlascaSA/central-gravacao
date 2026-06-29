@@ -26,6 +26,7 @@ export default function App() {
   const [selMode, setSelMode] = useState(false)
   const sigRef = useRef('')
   const abriuLinkRef = useRef(false)
+  const boardRef = useRef<HTMLDivElement>(null)
   // exclusões com "Desfazer": some da tela na hora, efetiva no banco depois de 5s
   const [pendingDel, setPendingDel] = useState<{ id: string; titulo: string }[]>([])
   const delTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -112,6 +113,12 @@ export default function App() {
     [daSemana, filtro],
   )
 
+  const naJaylton = useMemo(() => ativosFiltrados.filter((c) => c.fase === 'para Jaylton gravar').length, [ativosFiltrados])
+  function irParaJaylton() {
+    const el = boardRef.current
+    if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' })
+  }
+
   const semanaParaNovos = vistaSem === 'semana' ? semMonday : nextMonday()
 
   async function handleMove(id: string, fase: Fase) {
@@ -192,6 +199,8 @@ export default function App() {
           counts={counts}
           selMode={selMode}
           onToggleSel={() => setSelMode((v) => !v)}
+          jaylton={naJaylton}
+          onJaylton={irParaJaylton}
           onSubir={() => setUploadOpen(true)}
           onNovo={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? undefined : filtro)}
         />
@@ -203,7 +212,7 @@ export default function App() {
         </div>
       ) : vista === 'quadro' ? (
         <div className="flex-1 min-h-0">
-          <Board cards={ativosFiltrados} selMode={selMode} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
+          <Board cards={ativosFiltrados} selMode={selMode} scrollRef={boardRef} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
