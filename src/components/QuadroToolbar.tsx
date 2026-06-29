@@ -39,7 +39,7 @@ export default function QuadroToolbar({
   const seta = 'h-9 w-9 grid place-items-center rounded-md text-muted hover:text-ink hover:bg-surface-2 transition-colors'
 
   return (
-    <div className="relative z-10 border-b border-border/60 bg-surface/30">
+    <div className="relative z-10 shrink-0 border-b border-border/60 bg-surface/30">
       <div className="flex items-center gap-1.5 px-4 sm:px-6 py-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* tempo */}
         <div className={'shrink-0 flex items-center rounded-lg border p-0.5 bg-surface ' + (ehSemana ? 'border-brand/40' : 'border-border')}>

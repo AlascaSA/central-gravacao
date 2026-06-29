@@ -178,7 +178,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-dvh">
+    <div className="h-dvh flex flex-col overflow-hidden">
       <Header vista={vista} onVista={setVista} />
 
       {vista === 'quadro' && (
@@ -195,17 +195,17 @@ export default function App() {
       )}
 
       {carregando ? (
-        <div className="relative z-10 grid place-items-center py-24">
+        <div className="flex-1 grid place-items-center">
           <div className="h-7 w-7 rounded-full border-[3px] border-border-strong border-t-brand animate-spin" />
         </div>
       ) : vista === 'quadro' ? (
-        <Board cards={ativosFiltrados} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
-      ) : vista === 'catalogo' ? (
-        <Catalogo />
-      ) : vista === 'links' ? (
-        <Links />
+        <div className="flex-1 min-h-0">
+          <Board cards={ativosFiltrados} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
+        </div>
       ) : (
-        <Archive cards={arquivados} />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {vista === 'catalogo' ? <Catalogo /> : vista === 'links' ? <Links /> : <Archive cards={arquivados} />}
+        </div>
       )}
 
       {vista === 'quadro' && (

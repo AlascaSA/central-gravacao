@@ -4,7 +4,7 @@ const LABEL: Record<Vista, string> = { quadro: 'Quadro', arquivo: 'Arquivo', cat
 
 export default function Header({ vista, onVista }: { vista: Vista; onVista: (v: Vista) => void }) {
   return (
-    <header className="glass sticky top-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 border-b border-border/70">
+    <header className="glass shrink-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 pt-[calc(env(safe-area-inset-top)+14px)] pb-3 border-b border-border/70">
       <div className="flex items-center gap-3 min-w-0">
         <img src="/alasca-logo.png" alt="Alasca" className="h-[22px] sm:h-6 w-auto shrink-0" />
         <span className="hidden sm:block h-5 w-px bg-border-strong shrink-0" aria-hidden />

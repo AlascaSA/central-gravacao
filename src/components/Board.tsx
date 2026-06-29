@@ -99,10 +99,10 @@ export default function Board({
       onDragCancel={() => setActiveId(null)}
       autoScroll={{ threshold: { x: 0, y: 0.2 } }}
     >
-      <div className="relative z-10">
+      <div className="relative z-10 h-full">
         <div
           ref={scrollRef}
-          className={'flex gap-3.5 overflow-x-auto px-4 sm:px-6 pt-4 pb-32 sm:pb-14 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
+          className={'flex gap-3.5 h-full overflow-x-auto px-4 sm:px-6 pt-4 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
         >
           {FASES.map((fase) => (
             <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} />
