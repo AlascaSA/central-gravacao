@@ -95,6 +95,21 @@ body::before {
 ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 ::-webkit-scrollbar-track { background: transparent; }
 
+/* barras do quadro: grossas e sempre visíveis pra dar pra agarrar e arrastar com o mouse */
+.scroll-quadro { scrollbar-width: auto; scrollbar-color: var(--color-border-strong) transparent; }
+.scroll-quadro::-webkit-scrollbar { width: 15px; height: 15px; }
+.scroll-quadro::-webkit-scrollbar-track { background: color-mix(in srgb, var(--color-bg) 60%, transparent); }
+.scroll-quadro::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  min-height: 40px;
+  min-width: 40px;
+}
+.scroll-quadro::-webkit-scrollbar-thumb:hover { background: var(--color-muted); background-clip: content-box; }
+.scroll-quadro::-webkit-scrollbar-corner { background: transparent; }
+
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }

@@ -72,19 +72,14 @@ export default function Board({
     }
   }, [activeId])
 
-  // roda do mouse comum (só eixo Y) move o quadro na horizontal quando a coluna
-  // sob o ponteiro não tem mais o que rolar na vertical — padrão Kanban (Trello)
+  // roda do mouse comum (só eixo Y): quando o quadro não tem o que rolar na
+  // vertical, a roda anda na horizontal; se tiver, rola na vertical (nativo)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (e.deltaY === 0 || e.shiftKey) return
-      const lista = (e.target as Element | null)?.closest?.('[data-col-scroll]') as HTMLElement | null
-      if (lista) {
-        const podeDescer = e.deltaY > 0 && lista.scrollTop + lista.clientHeight < lista.scrollHeight - 1
-        const podeSubir = e.deltaY < 0 && lista.scrollTop > 0
-        if (podeDescer || podeSubir) return // deixa a coluna rolar na vertical
-      }
+      if (el.scrollHeight > el.clientHeight + 1) return // tem rolagem vertical: deixa nativo
       if (el.scrollWidth <= el.clientWidth) return
       el.scrollLeft += e.deltaY
       e.preventDefault()
@@ -166,7 +161,7 @@ export default function Board({
       <div className="relative z-10 h-full">
         <div
           ref={scrollRef}
-          className={'flex gap-3.5 h-full overflow-x-auto px-4 sm:px-6 pt-4 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
+          className={'scroll-quadro flex items-start gap-5 sm:gap-6 h-full overflow-auto px-4 sm:px-6 pt-4 pb-24 sm:pb-6 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
         >
           {FASES.map((fase) => (
             <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={selMode ? toggleSel : undefined} />
