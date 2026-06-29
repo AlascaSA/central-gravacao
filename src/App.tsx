@@ -24,6 +24,7 @@ export default function App() {
   const [vistaSem, setVistaSem] = useState<VistaSemana>('semana')
   const [detailCard, setDetailCard] = useState<Card | null>(null)
   const sigRef = useRef('')
+  const abriuLinkRef = useRef(false)
   // exclusões com "Desfazer": some da tela na hora, efetiva no banco depois de 5s
   const [pendingDel, setPendingDel] = useState<{ id: string; titulo: string }[]>([])
   const delTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -71,6 +72,15 @@ export default function App() {
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [])
+
+  // link direto pro card (?card=<id>) — abre o detalhe quando os cards carregam
+  useEffect(() => {
+    if (abriuLinkRef.current || cards.length === 0) return
+    const id = new URLSearchParams(window.location.search).get('card')
+    if (!id) { abriuLinkRef.current = true; return }
+    const c = cards.find((x) => x.id === id)
+    if (c) { setDetailCard(c); abriuLinkRef.current = true }
+  }, [cards])
 
   const ativos = useMemo(() => cards.filter((c) => !c.arquivado && !pendingDel.some((p) => p.id === c.id)), [cards, pendingDel])
   const arquivados = useMemo(() => cards.filter((c) => c.arquivado), [cards])
@@ -233,7 +243,7 @@ export default function App() {
         onClose={() => setUploadOpen(false)}
         onDone={recarregar}
       />
-      <CardDetail card={detailCard} onClose={() => setDetailCard(null)} />
+      <CardDetail card={detailCard} onClose={() => { setDetailCard(null); if (new URLSearchParams(window.location.search).get('card')) window.history.replaceState({}, '', window.location.pathname) }} />
     </div>
   )
 }

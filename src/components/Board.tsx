@@ -70,6 +70,11 @@ export default function Board({
   }, [activeId])
 
   const activeCard = activeId ? cards.find((c) => c.id === activeId) ?? null : null
+  const naJaylton = cards.filter((c) => c.fase === 'para Jaylton gravar').length
+  function scrollToFim() {
+    const el = scrollRef.current
+    if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' })
+  }
 
   function onDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id))
@@ -94,13 +99,28 @@ export default function Board({
       onDragCancel={() => setActiveId(null)}
       autoScroll={{ threshold: { x: 0, y: 0.2 } }}
     >
-      <div
-        ref={scrollRef}
-        className={'relative z-10 flex gap-3.5 overflow-x-auto px-4 sm:px-6 pt-4 pb-32 sm:pb-14 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
-      >
-        {FASES.map((fase) => (
-          <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} />
-        ))}
+      <div className="relative z-10">
+        <div
+          ref={scrollRef}
+          className={'flex gap-3.5 overflow-x-auto px-4 sm:px-6 pt-4 pb-32 sm:pb-14 ' + (activeId ? '' : '[scroll-snap-type:x_proximity]')}
+        >
+          {FASES.map((fase) => (
+            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} />
+          ))}
+        </div>
+
+        {naJaylton > 0 && !activeId && (
+          <button
+            onClick={scrollToFim}
+            title="Ir para a coluna do Jaylton"
+            className="absolute top-3 right-4 sm:right-6 z-20 inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-surface/95 backdrop-blur px-3 py-1.5 text-[12px] font-semibold text-ink-2 shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] hover:text-ink hover:border-[#94a3b8] transition-colors"
+          >
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: '#94a3b8' }} />
+            para Jaylton gravar
+            <span className="tnum text-[11px] font-bold bg-surface-3 rounded-full px-1.5">{naJaylton}</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+        )}
       </div>
 
       <DragOverlay dropAnimation={null}>

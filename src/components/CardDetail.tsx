@@ -38,6 +38,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [cp, setCp] = useState<Copy | undefined>(card?.copy)
   const [semR, setSemR] = useState<boolean>(!!card?.semRoteiro)
   const [salvoMsg, setSalvoMsg] = useState<'' | 'salvo' | 'erro'>('')
+  const [copiado, setCopiado] = useState<string | null>(null)
 
   // feedback discreto do auto-save (antes o erro era engolido silenciosamente)
   const marcarSalvo = () => setSalvoMsg('salvo')
@@ -111,6 +112,14 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   function mudarComentTomada(drive_id: string, txt: string) {
     setLinked((ls) => ls.map((b) => (b.drive_id === drive_id ? { ...b, comentario: txt } : b)))
   }
+  // links pro gestor levar pro ClickUp: o do card (abre no app) e o do vídeo (Drive)
+  const driveLink = (id: string) => `https://drive.google.com/file/d/${id}/view`
+  function copiar(texto: string, qual: string) {
+    navigator.clipboard?.writeText(texto).then(() => {
+      setCopiado(qual)
+      setTimeout(() => setCopiado(null), 1500)
+    }).catch(() => {})
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -151,6 +160,17 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               ) : 'erro ao salvar'}
             </span>
           )}
+          <button
+            onClick={() => copiar(`${window.location.origin}/?card=${card.id}`, 'card')}
+            title="Copiar link do card (pra colar na tarefa do ClickUp)"
+            className={'shrink-0 self-center inline-flex items-center gap-1.5 rounded-xl border h-9 px-2.5 text-[12px] font-semibold transition-colors ' + (copiado === 'card' ? 'border-green/40 text-green bg-green/10' : 'border-border bg-surface-2 text-ink-2 hover:text-ink hover:border-border-strong')}
+          >
+            {copiado === 'card' ? (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>copiado</>
+            ) : (
+              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5" /></svg>link do card</>
+            )}
+          </button>
           <button onClick={onClose} aria-label="Fechar" className="shrink-0 h-9 w-9 grid place-items-center rounded-xl bg-surface-2 border border-border text-muted hover:text-ink transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
@@ -264,6 +284,9 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                         </button>
                         <span className="text-[13px] font-semibold truncate flex-1">{b.nome || b.drive_id}</span>
                         {t && <span className={'shrink-0 text-[11px] font-bold rounded-md px-1.5 py-0.5 ' + (TIPO_COR[t] ?? 'text-muted bg-surface-2')}>{t}</span>}
+                        <button onClick={() => copiar(driveLink(b.drive_id), b.drive_id)} title="Copiar link do vídeo no Drive (pra colar no ClickUp)" className={'shrink-0 text-[11px] font-semibold ' + (copiado === b.drive_id ? 'text-green' : 'text-muted hover:text-ink')}>
+                          {copiado === b.drive_id ? 'copiado' : 'link Drive'}
+                        </button>
                         <a href={baixarDe(b.drive_id, b.nome || 'video.mp4')} className="shrink-0 text-[11px] font-semibold text-brand-2 hover:text-brand">Baixar</a>
                         <button onClick={() => retirar(b.drive_id)} title="Retirar da tarefa" className="shrink-0 h-7 w-7 grid place-items-center rounded-lg text-muted hover:text-rose-300 transition-colors">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
