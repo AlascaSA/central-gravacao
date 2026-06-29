@@ -74,7 +74,6 @@ export function CardView({
   return (
     <div
       ref={dragRef}
-      data-card
       {...(dragProps ?? {})}
       onClick={() => {
         if (overlay) return

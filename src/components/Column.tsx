@@ -36,7 +36,7 @@ export default function Column({
   const { setNodeRef, isOver } = useDroppable({ id: fase })
   const cor = FASE_COR[fase]
   return (
-    <section className="shrink-0 w-[86vw] max-w-[300px] [scroll-snap-align:start]">
+    <section className="shrink-0 w-[86vw] max-w-[300px]">
       <div className="flex items-center gap-2 px-1.5 pb-2.5 pt-0.5 sticky top-0 z-[1] bg-bg/95 backdrop-blur-sm">
         <span className="h-2 w-2 rounded-full shrink-0" style={{ background: cor }} />
         <h2 className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink-2 truncate">{fase}</h2>
