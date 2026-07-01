@@ -1,10 +1,10 @@
 // Proxy de download dos brutos do Google Drive (Cloudflare Worker).
-// SEGURANÇA: só serve arquivos da pasta Brutos E só com link assinado (HMAC) e válido (exp).
+// SEGURANÇA: só serve arquivos do Shared Drive dos brutos E só com link assinado (HMAC) e válido (exp).
 // A chave de assinatura (DL_SECRET) fica no servidor; o link é gerado pela função do app e expira.
 // Usa a service account (JWT via Web Crypto) e faz STREAMING via API do Drive:
 // sem aviso de vírus, qualquer tamanho, egress grátis. Responde como attachment (baixa direto).
 
-const BRUTOS_FOLDER_ID = '1Fkdt2hYQQ6K8DJyvDy1tliCpYDhS1Qil'
+const SHARED_DRIVE_ID = '0ANh1nYBAOuTbUk9PVA' // Shared Drive dos brutos
 let _tok = null
 
 function b64urlBytes(bytes) {
@@ -73,10 +73,10 @@ export default {
     const nome = (url.searchParams.get('name') || 'video.mp4').replace(/[\r\n"\\]/g, '')
     try {
       const token = await getToken(env)
-      // 2) o arquivo TEM que estar na pasta Brutos
-      const metaR = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=parents&supportsAllDrives=true', { headers: { Authorization: 'Bearer ' + token } })
+      // 2) o arquivo TEM que estar no Shared Drive dos brutos
+      const metaR = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=driveId&supportsAllDrives=true', { headers: { Authorization: 'Bearer ' + token } })
       const meta = await metaR.json()
-      if (!metaR.ok || !meta.parents || !meta.parents.includes(BRUTOS_FOLDER_ID)) {
+      if (!metaR.ok || meta.driveId !== SHARED_DRIVE_ID) {
         return new Response('arquivo não permitido', { status: 403 })
       }
       // 3) stream
