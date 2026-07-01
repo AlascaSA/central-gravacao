@@ -2,6 +2,10 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # pdf-parse v2 (pdfjs) precisa de Node 22 (Promise.withResolvers) — senão a leitura de PDF falha
+  NODE_VERSION = "22"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
