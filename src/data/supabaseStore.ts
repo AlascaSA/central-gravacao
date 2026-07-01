@@ -159,6 +159,17 @@ export function createSupabaseStore(): Store {
       return toCard(data as Row)
     },
 
+    async definirUrgencia(id, urgencia) {
+      const { data, error } = await sb
+        .from('cards')
+        .update({ urgencia, atualizado_em: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      return toCard(data as Row)
+    },
+
     async definirCopy(id, copy) {
       const { data, error } = await sb
         .from('cards')

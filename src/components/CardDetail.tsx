@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { Card, Categoria, Copy } from '../types'
-import { CATEGORIAS, COPYS } from '../types'
+import type { Card, Categoria, Copy, Urgencia } from '../types'
+import { CATEGORIAS, COPYS, URGENCIAS } from '../types'
 import { viewerUrl } from '../viewer'
 import { store } from '../data/store'
 import { listarBrutosDoCard, ligarBruto, comentarBruto, type BrutoLigado } from '../data/catalogoBrutos'
@@ -13,6 +13,8 @@ const urgColor: Record<string, string> = {
   média: 'text-amber bg-amber/15',
   baixa: 'text-green bg-green/15',
 }
+// "média" no dado = "Normal" pra equipe
+export const URG_LABEL: Record<Urgencia, string> = { alta: 'Alta', média: 'Normal', baixa: 'Baixa' }
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string
 const proxyDe = (id: string) => `${SUPA}/storage/v1/object/public/proxies/${id}.mp4`
@@ -39,6 +41,7 @@ function linkificar(texto: string) {
 
 export default function CardDetail({ card, onClose }: { card: Card | null; onClose: () => void }) {
   const [cat, setCat] = useState<Categoria | undefined>(card?.categoria)
+  const [urg, setUrg] = useState<Urgencia | undefined>(card?.urgencia)
   const [prod, setProd] = useState<string | undefined>(card?.produto)
   const [linked, setLinked] = useState<BrutoLigado[]>([])
   const [playing, setPlaying] = useState<string | null>(null)
@@ -65,6 +68,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
 
   useEffect(() => {
     setCat(card?.categoria)
+    setUrg(card?.urgencia)
     setProd(card?.produto)
     setTit(card?.titulo || '')
     setEditTit(false)
@@ -91,6 +95,10 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   function trocarCat(c: Categoria) {
     setCat(c)
     store.definirCategoria(card!.id, c).then(marcarSalvo, marcarErro)
+  }
+  function trocarUrg(u: Urgencia) {
+    setUrg(u)
+    store.definirUrgencia(card!.id, u).then(marcarSalvo, marcarErro)
   }
   function trocarProd(p: string) {
     setProd(p)
@@ -164,8 +172,8 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
               {cp && <span className="text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{cp}</span>}
               {semR && <span className="text-[11px] font-bold text-amber bg-amber/12 rounded-full px-2 py-0.5">sem roteiro</span>}
               {card.campanha && <span className="text-[12px] text-muted">{card.campanha}</span>}
-              <span className={'text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + (urgColor[card.urgencia] ?? 'text-muted bg-surface-2')}>
-                {card.urgencia}
+              <span className={'text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 ' + (urgColor[urg ?? 'média'] ?? 'text-muted bg-surface-2')}>
+                {URG_LABEL[urg ?? 'média']}
               </span>
             </div>
           </div>
@@ -226,6 +234,20 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                 className={'text-[12px] font-semibold rounded-lg border px-2.5 py-1 transition-colors ' + (cat === c ? (CAT_COR[c] + ' border-transparent') : 'bg-surface-2 border-border text-muted hover:text-ink')}
               >
                 {c}
+              </button>
+            ))}
+          </div>
+
+          {/* urgência */}
+          <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Urgência</div>
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {URGENCIAS.map((u) => (
+              <button
+                key={u}
+                onClick={() => trocarUrg(u)}
+                className={'text-[12px] font-semibold rounded-lg border px-2.5 py-1 transition-colors ' + (urg === u ? (urgColor[u] + ' border-transparent') : 'bg-surface-2 border-border text-muted hover:text-ink')}
+              >
+                {URG_LABEL[u]}
               </button>
             ))}
           </div>

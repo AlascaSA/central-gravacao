@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { addWeeks, currentMonday, weekLabel } from '../week'
-import { COPYS, type Copy } from '../types'
+import { CATEGORIAS, COPYS, URGENCIAS, type Categoria, type Copy, type Urgencia } from '../types'
 
 export type VistaSemana = 'semana' | 'sem' | 'todas'
 export type FiltroCopy = Copy | 'Todas' | 'Sem roteiro'
+export type FiltroCat = Categoria | 'Todas'
+export type FiltroUrg = Urgencia | 'Todas'
 
 const COPY_OPCOES: FiltroCopy[] = ['Todas', ...COPYS, 'Sem roteiro']
+const CAT_OPCOES: FiltroCat[] = ['Todas', ...CATEGORIAS]
+const URG_OPCOES: FiltroUrg[] = ['Todas', ...URGENCIAS]
+// "média" no dado = "Normal" pra equipe
+const URG_ROTULO: Record<string, string> = { Todas: 'Todas', alta: 'Alta', média: 'Normal', baixa: 'Baixa' }
 
 // Barra do quadro: período (controle fixo c/ menu) | copy (rola) | ações fixas.
 export default function QuadroToolbar({
@@ -14,6 +20,10 @@ export default function QuadroToolbar({
   onChangeSemana,
   filtro,
   onChangeFiltro,
+  filtroCat,
+  onChangeCat,
+  filtroUrg,
+  onChangeUrg,
   counts,
   selMode,
   onToggleSel,
@@ -27,6 +37,10 @@ export default function QuadroToolbar({
   onChangeSemana: (monday: string, vista: VistaSemana) => void
   filtro: FiltroCopy
   onChangeFiltro: (v: FiltroCopy) => void
+  filtroCat: FiltroCat
+  onChangeCat: (v: FiltroCat) => void
+  filtroUrg: FiltroUrg
+  onChangeUrg: (v: FiltroUrg) => void
   counts: Record<string, number>
   selMode: boolean
   onToggleSel: () => void
@@ -36,6 +50,8 @@ export default function QuadroToolbar({
   onNovo: () => void
 }) {
   const [menuTempo, setMenuTempo] = useState(false)
+  const [menuFiltros, setMenuFiltros] = useState(false)
+  const filtrosAtivos = (filtroCat !== 'Todas' ? 1 : 0) + (filtroUrg !== 'Todas' ? 1 : 0)
   const ehSemana = vistaSem === 'semana'
   const ehAtual = ehSemana && monday === currentMonday()
   const base = ehSemana ? monday : currentMonday()
@@ -52,6 +68,9 @@ export default function QuadroToolbar({
   const item = (ativo: boolean) =>
     'w-full text-left px-3 py-2 rounded-md text-[12px] font-semibold transition-colors ' +
     (ativo ? 'bg-brand/12 text-brand-2' : 'text-ink-2 hover:bg-surface-2')
+  const filtChip = (ativo: boolean) =>
+    'text-[12px] font-semibold rounded-md border px-2 py-1 transition-colors ' +
+    (ativo ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface-2 border-border text-ink-2 hover:text-ink hover:border-border-strong')
 
   return (
     <div className="relative z-20 shrink-0 border-b border-border/60 bg-surface/30">
@@ -115,6 +134,45 @@ export default function QuadroToolbar({
 
         {/* ações fixas à direita */}
         <span className="shrink-0 w-px h-6 bg-border mx-0.5" />
+
+        {/* filtros por categoria e urgência (menu, fora da área que rola) */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setMenuFiltros((v) => !v)}
+            title="Filtrar por categoria e urgência"
+            className={
+              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ' +
+              (filtrosAtivos ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface/60 border-border text-ink-2 hover:border-border-strong hover:text-ink')
+            }
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18M6 12h12M10 19h4" /></svg>
+            <span className="hidden sm:inline">Filtros</span>
+            {filtrosAtivos > 0 && <span className="tnum text-[10px] font-bold bg-brand/25 text-brand-2 rounded-full px-1.5">{filtrosAtivos}</span>}
+          </button>
+          {menuFiltros && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setMenuFiltros(false)} />
+              <div className="absolute top-full right-0 mt-1.5 z-30 w-60 rounded-xl border border-border-strong bg-elev p-2.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.7)]">
+                <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-1.5">Categoria</div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {CAT_OPCOES.map((c) => (
+                    <button key={c} onClick={() => onChangeCat(c)} className={filtChip(filtroCat === c)}>{c}</button>
+                  ))}
+                </div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted mb-1.5">Urgência</div>
+                <div className="flex flex-wrap gap-1">
+                  {URG_OPCOES.map((u) => (
+                    <button key={u} onClick={() => onChangeUrg(u)} className={filtChip(filtroUrg === u)}>{URG_ROTULO[u] ?? u}</button>
+                  ))}
+                </div>
+                {filtrosAtivos > 0 && (
+                  <button onClick={() => { onChangeCat('Todas'); onChangeUrg('Todas') }} className="mt-3 w-full text-center text-[12px] font-semibold text-muted hover:text-ink rounded-md py-1.5 hover:bg-surface-2 transition-colors">Limpar filtros</button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
         <button
           onClick={onToggleSel}
           title={selMode ? 'Cancelar seleção' : 'Selecionar vídeos pra baixar em lote'}

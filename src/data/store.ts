@@ -1,4 +1,4 @@
-import type { Card, Categoria, Copy, Doc, Fase, NovoCard } from '../types'
+import type { Card, Categoria, Copy, Doc, Fase, NovoCard, Urgencia } from '../types'
 import { currentMonday } from '../week'
 import { hasSupabase } from './supabase'
 import { createSupabaseStore } from './supabaseStore'
@@ -20,6 +20,8 @@ export interface Store {
   definirComentario(id: string, comentario: string): Promise<Card>
   /** Define/troca a categoria da tarefa. */
   definirCategoria(id: string, categoria: Categoria): Promise<Card>
+  /** Define/troca a urgência da tarefa. */
+  definirUrgencia(id: string, urgencia: Urgencia): Promise<Card>
   /** Define/troca a copy (responsável) da tarefa. */
   definirCopy(id: string, copy: Copy): Promise<Card>
   /** Marca/desmarca a tarefa como "sem roteiro" (independente da copy). */
@@ -122,6 +124,13 @@ export function createMockStore(): Store {
       const c = cards.find((x) => x.id === id)
       if (!c) throw new Error('Card não encontrado')
       c.categoria = categoria
+      c.atualizadoEm = agora()
+      return { ...c }
+    },
+    async definirUrgencia(id, urgencia) {
+      const c = cards.find((x) => x.id === id)
+      if (!c) throw new Error('Card não encontrado')
+      c.urgencia = urgencia
       c.atualizadoEm = agora()
       return { ...c }
     },

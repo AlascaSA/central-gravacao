@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { store } from './data/store'
-import type { Card, Copy, Fase, NovoCard } from './types'
+import type { Card, Categoria, Copy, Fase, NovoCard, Urgencia } from './types'
 import Header, { type Vista } from './components/Header'
 import QuadroToolbar, { type FiltroCopy, type VistaSemana } from './components/QuadroToolbar'
 import Board from './components/Board'
@@ -16,6 +16,8 @@ export default function App() {
   const [cards, setCards] = useState<Card[]>([])
   const [carregando, setCarregando] = useState(true)
   const [filtro, setFiltro] = useState<FiltroCopy>('Todas')
+  const [filtroCat, setFiltroCat] = useState<Categoria | 'Todas'>('Todas')
+  const [filtroUrg, setFiltroUrg] = useState<Urgencia | 'Todas'>('Todas')
   const [vista, setVista] = useState<Vista>('quadro')
   const [modalOpen, setModalOpen] = useState(false)
   const [modalCopy, setModalCopy] = useState<Copy | undefined>(undefined)
@@ -94,23 +96,32 @@ export default function App() {
     return ativos.filter((c) => c.semana === semMonday)
   }, [ativos, vistaSem, semMonday])
 
+  // categoria + urgência aplicadas antes da copy, pra as contagens de copy refletirem esses filtros
+  const contexto = useMemo(
+    () =>
+      daSemana
+        .filter((c) => filtroCat === 'Todas' || c.categoria === filtroCat)
+        .filter((c) => filtroUrg === 'Todas' || c.urgencia === filtroUrg),
+    [daSemana, filtroCat, filtroUrg],
+  )
+
   const counts = useMemo(() => {
-    const r: Record<string, number> = { __total: daSemana.length }
-    for (const c of daSemana) {
+    const r: Record<string, number> = { __total: contexto.length }
+    for (const c of contexto) {
       if (c.copy) r[c.copy] = (r[c.copy] ?? 0) + 1
       if (c.semRoteiro) r['Sem roteiro'] = (r['Sem roteiro'] ?? 0) + 1
     }
     return r
-  }, [daSemana])
+  }, [contexto])
 
   const ativosFiltrados = useMemo(
     () =>
       filtro === 'Todas'
-        ? daSemana
+        ? contexto
         : filtro === 'Sem roteiro'
-          ? daSemana.filter((c) => c.semRoteiro)
-          : daSemana.filter((c) => c.copy === filtro),
-    [daSemana, filtro],
+          ? contexto.filter((c) => c.semRoteiro)
+          : contexto.filter((c) => c.copy === filtro),
+    [contexto, filtro],
   )
 
   const naJaylton = useMemo(() => ativosFiltrados.filter((c) => c.fase === 'para Jaylton gravar').length, [ativosFiltrados])
@@ -196,6 +207,10 @@ export default function App() {
           onChangeSemana={(m, v) => { setSemMonday(m); setVistaSem(v) }}
           filtro={filtro}
           onChangeFiltro={setFiltro}
+          filtroCat={filtroCat}
+          onChangeCat={setFiltroCat}
+          filtroUrg={filtroUrg}
+          onChangeUrg={setFiltroUrg}
           counts={counts}
           selMode={selMode}
           onToggleSel={() => setSelMode((v) => !v)}
