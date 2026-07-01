@@ -60,15 +60,19 @@ async function jaComCapa() {
   return s
 }
 
-async function upsert(v, capa_url) {
+// sincroniza os metadados (mês/dia/etc.) SEMPRE; capa_url só é escrita se veio uma capa nova
+// (omitir a coluna no upsert merge-duplicates preserva o valor que já existe).
+async function upsert(v, capa) {
+  const body = {
+    drive_id: v.id, nome: v.name, mes: v.mes, dia: v.dia,
+    mb: v.size ? Math.round(v.size / 1048576) : null, duracao: v.seg,
+    criado: v.createdTime, pasta_id: v.pastaId,
+  }
+  if (capa) body.capa_url = capa
   const r = await sb('brutos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
-    body: JSON.stringify({
-      drive_id: v.id, nome: v.name, mes: v.mes, dia: v.dia, capa_url,
-      mb: v.size ? Math.round(v.size / 1048576) : null, duracao: v.seg,
-      criado: v.createdTime, pasta_id: v.pastaId,
-    }),
+    body: JSON.stringify(body),
   })
   if (!r.ok) throw new Error('upsert ' + r.status + ' ' + (await r.text()).slice(0, 120))
 }
@@ -82,18 +86,35 @@ const raizes = pastaId ? [pastaId] : undefined
 const token = await driveToken()
 const videos = await listarVideos(token, raizes)
 const feitos = await jaComCapa()
-const alvo = videos.filter((v) => !feitos.has(v.id))
-console.log(`${videos.length} vídeos, ${feitos.size} já com capa, ${alvo.length} a processar`)
-for (const v of alvo) {
+const semCapa = videos.filter((v) => !feitos.has(v.id))
+console.log(`${videos.length} vídeos, ${feitos.size} já com capa, ${semCapa.length} sem capa`)
+for (const v of videos) {
   try {
-    process.stdout.write(`• ${v.name} (${v.mes || '?'}/${v.dia || '?'})…`)
-    const capa = await gerarCapa(v.id)
-    await upsert(v, capa)
-    console.log(' OK')
+    let capa = null
+    if (!feitos.has(v.id)) {
+      process.stdout.write(`• capa ${v.name} (${v.mes || '?'}/${v.dia || '?'})…`)
+      capa = await gerarCapa(v.id)
+      console.log(' OK')
+    }
+    await upsert(v, capa) // sincroniza mês/dia mesmo dos que já têm capa
   } catch (e) {
     console.log(' ERRO: ' + e.message)
     try { await upsert(v, null) } catch { /* segue */ }
   }
+}
+// limpeza: só em varredura completa (sem --pasta). Remove do catálogo os que sumiram do Drive
+// e NÃO estão ligados a um card (esses ficam pra não quebrar o vínculo).
+if (!raizes) {
+  try {
+    const emBanco = await (await sb('brutos?select=drive_id,card_id')).json()
+    const scanned = new Set(videos.map((v) => v.id))
+    const removidos = (Array.isArray(emBanco) ? emBanco : []).filter((b) => !scanned.has(b.drive_id) && !b.card_id).map((b) => b.drive_id)
+    if (removidos.length) {
+      const lista = removidos.map((id) => `"${id}"`).join(',')
+      const r = await sb(`brutos?drive_id=in.(${lista})`, { method: 'DELETE' })
+      console.log(`removidos do catálogo: ${removidos.length} (${r.ok ? 'ok' : 'falhou ' + r.status})`)
+    }
+  } catch (e) { console.log('prune erro: ' + e.message) }
 }
 fs.rmSync(TMP, { recursive: true, force: true })
 console.log('fim')
