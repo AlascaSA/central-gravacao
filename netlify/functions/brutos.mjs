@@ -6,7 +6,7 @@ const KEY = process.env.VITE_SUPABASE_ANON_KEY
 export default async () => {
   try {
     const url =
-      `${SUPA}/rest/v1/brutos?select=drive_id,nome,mes,dia,capa_url,mb,duracao,criado&order=criado.desc.nullslast`
+      `${SUPA}/rest/v1/brutos?select=drive_id,nome,mes,dia,capa_url,mb,duracao,criado,proxy_id&order=criado.desc.nullslast`
     const r = await fetch(url, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
     const rows = await r.json()
     if (!Array.isArray(rows)) return Response.json({ error: (rows && rows.message) || 'erro' }, { status: 500 })
@@ -19,6 +19,7 @@ export default async () => {
       criado: b.criado ?? null,
       mes: b.mes ?? null,
       dia: b.dia ?? null,
+      temProxy: !!b.proxy_id,
     }))
     return Response.json({ videos })
   } catch (e) {

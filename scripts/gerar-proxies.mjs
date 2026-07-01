@@ -1,160 +1,140 @@
-// Gera proxies leves (1080p H.264 + AAC, faststart) dos brutos do Drive e sobe pro Supabase Storage.
-// Uso: node scripts/gerar-proxies.mjs [idDoArquivo]   (sem arg = processa todos os que faltam)
+// Gera uma versão LEVE (720p H.264, faststart) de cada bruto que ainda não tem proxy e sobe pro Drive,
+// numa pasta "__proxies__" dentro dos brutos (ignorada pela varredura). Grava proxy_id na tabela `brutos`.
+// Isso resolve o "ainda processando" do player do Drive em vídeos 4K não transcodificados: o app toca o proxy.
+// Uso: SUPA_SECRET=... GOOGLE_SERVICE_ACCOUNT_KEY=... node scripts/gerar-proxies.mjs [--hw]
+//   --hw = usa o encoder de hardware do Mac (h264_videotoolbox) em vez de libx264 (pra rodar local rápido).
 import { GoogleAuth } from 'google-auth-library'
-import { Readable } from 'node:stream'
 import { spawn } from 'node:child_process'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const KEY_PATH = '/Users/gcosta/Downloads/baixa-gravacoes-04ae892ee0e9.json'
-const FOLDER = '1Fkdt2hYQQ6K8DJyvDy1tliCpYDhS1Qil'
 const SUPA = 'https://kkvuioyferqbilfwdkqa.supabase.co'
 const SECRET = process.env.SUPA_SECRET
-const BUCKET = 'proxies'
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'proxies-'))
-
+const KEY_PATH = '/Users/gcosta/Downloads/baixa-gravacoes-04ae892ee0e9.json'
+const RAIZ_PROXIES = '1teUk4IYAMH3Fd99LvS1NvTyY2FPbeMq-' // raiz "Brutos": a pasta __proxies__ vive aqui dentro
+const NOME_PASTA = '__proxies__'
+const HW = process.argv.includes('--hw')
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'prox-'))
 if (!SECRET) { console.error('faltou SUPA_SECRET no env'); process.exit(1) }
 
-// chave da conta de serviço: ENV (nuvem) ou arquivo local
 const KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
   : JSON.parse(fs.readFileSync(KEY_PATH, 'utf8'))
-const auth = new GoogleAuth({ credentials: KEY, scopes: ['https://www.googleapis.com/auth/drive.readonly'] })
+const auth = new GoogleAuth({ credentials: KEY, scopes: ['https://www.googleapis.com/auth/drive'] })
 const client = await auth.getClient()
 const driveToken = async () => (await client.getAccessToken()).token
 
-async function listarBrutos() {
-  const token = await driveToken()
-  const q = `'${FOLDER}' in parents and trashed=false and mimeType contains 'video'`
-  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent('files(id,name,size)')}&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } })
+const sb = (p, opts = {}) => fetch(`${SUPA}/rest/v1/${p}`, { ...opts, headers: { apikey: SECRET, Authorization: 'Bearer ' + SECRET, ...(opts.headers || {}) } })
+
+// acha (ou cria) a pasta __proxies__ dentro da raiz de brutos
+async function pastaProxies(token) {
+  const q = encodeURIComponent(`name='${NOME_PASTA}' and '${RAIZ_PROXIES}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`)
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`, { headers: { Authorization: 'Bearer ' + token } })
   const d = await r.json()
-  return d.files || []
-}
-
-async function jaExistentes() {
-  const r = await fetch(`${SUPA}/storage/v1/object/list/${BUCKET}`, {
-    method: 'POST', headers: { Authorization: 'Bearer ' + SECRET, apikey: SECRET, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prefix: '', limit: 1000 }),
+  if (d.files && d.files[0]) return d.files[0].id
+  const cr = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: NOME_PASTA, mimeType: 'application/vnd.google-apps.folder', parents: [RAIZ_PROXIES] }),
   })
-  const d = await r.json()
-  return new Set(Array.isArray(d) ? d.map((o) => o.name) : [])
+  const cd = await cr.json()
+  if (!cd.id) throw new Error('criar pasta proxies: ' + JSON.stringify(cd).slice(0, 150))
+  return cd.id
 }
 
-function baixar(id, dest) {
-  return driveToken().then(async (token) => {
-    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, { headers: { Authorization: 'Bearer ' + token } })
-    if (!r.ok || !r.body) throw new Error('download ' + r.status)
-    await new Promise((res, rej) => {
-      const ws = fs.createWriteStream(dest)
-      Readable.fromWeb(r.body).pipe(ws).on('finish', res).on('error', rej)
-    })
-  })
+// mapa nome->id do que já está na pasta (retoma sem duplicar)
+async function existentes(token, pastaId) {
+  const m = new Map()
+  let page = null
+  do {
+    const q = encodeURIComponent(`'${pastaId}' in parents and trashed=false`)
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true` + (page ? '&pageToken=' + page : ''), { headers: { Authorization: 'Bearer ' + token } })
+    const d = await r.json()
+    for (const f of d.files || []) m.set(f.name, f.id)
+    page = d.nextPageToken
+  } while (page)
+  return m
 }
 
-// duração via ffprobe (pra dimensionar o bitrate do proxy)
-function duracaoDe(file) {
-  return new Promise((res) => {
-    const p = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', file], { stdio: ['ignore', 'pipe', 'ignore'] })
-    let out = ''
-    p.stdout.on('data', (d) => (out += d))
-    p.on('close', () => res(parseFloat(out) || 0))
-    p.on('error', () => res(0))
-  })
+// baixa o bruto (streaming pro disco, sem carregar tudo em memória)
+async function baixar(token, id, dst) {
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, { headers: { Authorization: 'Bearer ' + token } })
+  if (!r.ok || !r.body) throw new Error('baixar ' + r.status)
+  await pipeline(Readable.fromWeb(r.body), fs.createWriteStream(dst))
 }
 
-// bitrate de vídeo (kbps) pra o proxy caber abaixo de ~45MB (limite do Supabase free); clipes curtos ficam em 2500
-function bitrateAlvo(dur) {
-  if (!dur || dur <= 0) return 2500
-  const v = Math.floor((45 * 8000) / dur) - 128 // 45MB total menos o áudio
-  return Math.max(700, Math.min(2500, v))
-}
-
-// encoder: hardware no Mac (rápido), libx264 no Linux (nuvem do GitHub)
-function encArgs(vKbps) {
-  const mr = Math.round(vKbps * 1.45)
-  return process.platform === 'darwin'
-    ? ['-c:v', 'h264_videotoolbox', '-b:v', vKbps + 'k', '-maxrate', mr + 'k', '-bufsize', mr * 2 + 'k']
-    : ['-c:v', 'libx264', '-preset', 'veryfast', '-b:v', vKbps + 'k', '-maxrate', mr + 'k', '-bufsize', mr * 2 + 'k']
-}
-
-function transcodificar(src, out, vKbps) {
-  const args = [
-    '-y', '-i', src,
-    '-vf', "scale='min(1920,iw)':-2",
-    ...encArgs(vKbps),
-    '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
-    '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-    out,
-  ]
+// transcodifica pra 720p (cabe em 1280x1280 mantendo proporção; vale pra vertical e horizontal)
+function transcode(src, out) {
+  const vf = 'scale=w=1280:h=1280:force_original_aspect_ratio=decrease:force_divisible_by=2'
+  const args = HW
+    ? ['-y', '-i', src, '-vf', vf, '-c:v', 'h264_videotoolbox', '-b:v', '2500k', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out]
+    : ['-y', '-i', src, '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out]
   return new Promise((res, rej) => {
     const p = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'ignore'] })
-    p.on('close', (code) => (code === 0 ? res() : rej(new Error('ffmpeg saiu ' + code))))
+    p.on('close', (c) => (c === 0 && fs.existsSync(out) ? res() : rej(new Error('ffmpeg ' + c))))
     p.on('error', rej)
   })
 }
 
-// capa (jpg 640px) derivada do proxy — fallback caso o Drive não gere thumbnail do vídeo
-function extrairFrame(src, jpg) {
-  return new Promise((res, rej) => {
-    const p = spawn('ffmpeg', ['-y', '-ss', '1', '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', jpg], { stdio: ['ignore', 'ignore', 'ignore'] })
-    p.on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg thumb ' + c))))
-    p.on('error', rej)
-  })
-}
-async function gerarCapa(id, proxyFile) {
-  const jpg = proxyFile + '.jpg'
-  try {
-    await extrairFrame(proxyFile, jpg)
-    await fetch(`${SUPA}/storage/v1/object/${BUCKET}/${id}.jpg`, { method: 'POST', headers: { Authorization: 'Bearer ' + SECRET, apikey: SECRET, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' }, body: fs.readFileSync(jpg) })
-  } finally {
-    fs.rmSync(jpg, { force: true })
-  }
-}
-
-async function subir(id, file) {
-  const buf = fs.readFileSync(file)
-  const r = await fetch(`${SUPA}/storage/v1/object/${BUCKET}/${id}.mp4`, {
+// sobe o proxy pro Drive (multipart) e devolve o id do arquivo criado
+async function subir(token, pastaId, nome, file) {
+  const meta = JSON.stringify({ name: nome, parents: [pastaId] })
+  const boundary = '===cg_proxy_boundary_9f2a==='
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: video/mp4\r\n\r\n`),
+    fs.readFileSync(file),
+    Buffer.from(`\r\n--${boundary}--`),
+  ])
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id', {
     method: 'POST',
-    headers: { Authorization: 'Bearer ' + SECRET, apikey: SECRET, 'Content-Type': 'video/mp4', 'x-upsert': 'true' },
-    body: buf,
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
   })
-  if (!r.ok) throw new Error('upload ' + r.status + ' ' + (await r.text()).slice(0, 120))
-  return buf.length
+  const d = await r.json()
+  if (!d.id) throw new Error('subir ' + JSON.stringify(d).slice(0, 150))
+  return d.id
 }
 
-const mb = (n) => (n / 1048576).toFixed(1) + 'MB'
+const token0 = await driveToken()
+const pastaId = await pastaProxies(token0)
+const jaLa = await existentes(token0, pastaId)
 
-async function processar(f) {
-  const src = path.join(TMP, f.id + '.src')
-  const out = path.join(TMP, f.id + '.mp4')
+const alvosR = await sb('brutos?select=drive_id,nome&proxy_id=is.null')
+const alvos = await alvosR.json()
+if (!Array.isArray(alvos)) { console.error('erro lendo brutos:', JSON.stringify(alvos).slice(0, 200)); process.exit(1) }
+console.log(`${alvos.length} brutos sem proxy`)
+
+let ok = 0, err = 0
+for (const b of alvos) {
+  const id = b.drive_id
+  const nomeProxy = id + '.mp4'
+  const src = path.join(TMP, id + '.src')
+  const dst = path.join(TMP, nomeProxy)
   try {
-    process.stdout.write(`• ${f.name} (${f.size ? mb(Number(f.size)) : '?'}) baixando…`)
-    await baixar(f.id, src)
-    const vKbps = bitrateAlvo(await duracaoDe(src))
-    process.stdout.write(` transcodificando(${vKbps}k)…`)
-    await transcodificar(src, out, vKbps)
-    process.stdout.write(' subindo…')
-    const tam = await subir(f.id, out)
-    await gerarCapa(f.id, out).catch(() => {})
-    console.log(` OK ${mb(tam)}`)
+    let pid = jaLa.get(nomeProxy) // já transcodificado antes? só registra
+    if (!pid) {
+      process.stdout.write(`• proxy ${b.nome}…`)
+      await baixar(await driveToken(), id, src)
+      await transcode(src, dst)
+      pid = await subir(await driveToken(), pastaId, nomeProxy, dst)
+      fs.rmSync(src, { force: true }); fs.rmSync(dst, { force: true })
+      console.log(' OK')
+    }
+    const pr = await sb('brutos?drive_id=eq.' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ proxy_id: pid }),
+    })
+    if (!pr.ok) throw new Error('PATCH ' + pr.status + ' ' + (await pr.text()).slice(0, 100))
+    ok++
   } catch (e) {
-    console.log(` ERRO: ${e.message}`)
-  } finally {
-    fs.rmSync(src, { force: true })
-    fs.rmSync(out, { force: true })
+    console.log(' ERRO: ' + ((e && e.message) || e))
+    fs.rmSync(src, { force: true }); fs.rmSync(dst, { force: true })
+    err++
   }
 }
-
-const soId = process.argv[2]
-const todos = await listarBrutos()
-const feitos = await jaExistentes()
-let alvo = todos
-if (soId) alvo = todos.filter((f) => f.id === soId)
-else alvo = todos.filter((f) => !feitos.has(f.id + '.mp4'))
-
-console.log(`${todos.length} brutos, ${feitos.size} já feitos, ${alvo.length} a processar`)
-for (const f of alvo) await processar(f)
 fs.rmSync(TMP, { recursive: true, force: true })
-console.log('fim')
+console.log(`fim — ${ok} ok, ${err} erros`)

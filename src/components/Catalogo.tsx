@@ -220,6 +220,10 @@ export default function Catalogo() {
   const [salvNome, setSalvNome] = useState(false)
   const [erroNome, setErroNome] = useState('')
 
+  // player: URL assinada da versão leve (proxy). null enquanto carrega; prevErro cai no iframe do Drive.
+  const [prevUrl, setPrevUrl] = useState<string | null>(null)
+  const [prevErro, setPrevErro] = useState(false)
+
   useEffect(() => {
     setEditNome(false)
     setErroNome('')
@@ -227,6 +231,19 @@ export default function Catalogo() {
     setBuscaCard('')
     setNovaTarefa('')
   }, [aberto?.id])
+
+  // busca a URL da versão leve (proxy) ao abrir um vídeo que já a tem; erro cai no iframe do Drive
+  useEffect(() => {
+    setPrevUrl(null)
+    setPrevErro(false)
+    if (!aberto?.id || !aberto.temProxy) return
+    let cancel = false
+    fetch('/api/preview-url?id=' + encodeURIComponent(aberto.id))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('sem proxy'))))
+      .then((d) => { if (!cancel) { if (d.url) setPrevUrl(d.url); else setPrevErro(true) } })
+      .catch(() => { if (!cancel) setPrevErro(true) })
+    return () => { cancel = true }
+  }, [aberto?.id, aberto?.temProxy])
 
   // setas do teclado quando o player está aberto
   useEffect(() => {
@@ -464,15 +481,23 @@ export default function Catalogo() {
               )}
             </div>
             <div className="relative flex-1 min-h-0">
-              {/* player: sempre o do próprio Drive (logado) */}
-              <iframe
-                key={aberto.id}
-                src={drivePreview(aberto.id)}
-                title={aberto.nome}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                className="w-full h-full rounded-xl bg-black border-0"
-              />
+              {/* player: versão leve (proxy) quando existe — instantâneo, sem "processando"; senão, o do Drive */}
+              {aberto.temProxy && !prevErro ? (
+                prevUrl ? (
+                  <video key={prevUrl} src={prevUrl} controls autoPlay playsInline onError={() => setPrevErro(true)} className="w-full h-full rounded-xl bg-black object-contain" />
+                ) : (
+                  <div className="w-full h-full rounded-xl bg-black grid place-items-center"><div className="h-7 w-7 rounded-full border-[3px] border-white/20 border-t-white/80 animate-spin" /></div>
+                )
+              ) : (
+                <iframe
+                  key={aberto.id}
+                  src={drivePreview(aberto.id)}
+                  title={aberto.nome}
+                  allow="autoplay; fullscreen"
+                  allowFullScreen
+                  className="w-full h-full rounded-xl bg-black border-0"
+                />
+              )}
               {temPrev && (
                 <button onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
               )}

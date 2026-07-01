@@ -30,3 +30,9 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
+
+      - name: Gerar proxies leves (720p) dos que ainda não têm
+        run: node scripts/gerar-proxies.mjs
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SUPA_SECRET: ${{ secrets.SUPA_SECRET }}

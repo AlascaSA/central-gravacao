@@ -5,7 +5,7 @@ export const BRUTOS_ROOTS = [
   '1teUk4IYAMH3Fd99LvS1NvTyY2FPbeMq-', // "Brutos" (Reel geral, YouTube, Teste, STORYTELLING…)
   '1Fkdt2hYQQ6K8DJyvDy1tliCpYDhS1Qil', // "Brutos" antiga (vídeos soltos)
 ]
-export const IGNORAR_PASTAS = /editando|editado/i
+export const IGNORAR_PASTAS = /editando|editado|__proxies__/i
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
 const FIELDS =

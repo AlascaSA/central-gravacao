@@ -9,7 +9,7 @@ export const BRUTOS_ROOTS = [
 // Shared Drive dos brutos — usado pra liberar o download de qualquer bruto dele.
 export const SHARED_DRIVE_ID = '0ANh1nYBAOuTbUk9PVA'
 // Pastas ignoradas na varredura (vídeo editado, não bruto).
-export const IGNORAR_PASTAS = /editando|editado/i
+export const IGNORAR_PASTAS = /editando|editado|__proxies__/i
 
 let _auth
 function getAuth() {

@@ -62,12 +62,13 @@ export default {
     const id = url.searchParams.get('id')
     const exp = url.searchParams.get('exp')
     const sig = url.searchParams.get('sig')
+    const inline = url.searchParams.get('inline') === '1' // modo player (<video>): sem attachment
     if (!id || !exp || !sig) return new Response('faltam parâmetros', { status: 400 })
 
-    // 1) link assinado e válido
+    // 1) link assinado e válido (o payload muda no modo inline pra os links não serem intercambiáveis)
     const now = Math.floor(Date.now() / 1000)
     if (Number(exp) < now) return new Response('link expirado', { status: 403 })
-    const esperado = await hmac(env.DL_SECRET, id + ':' + exp)
+    const esperado = await hmac(env.DL_SECRET, inline ? id + ':' + exp + ':inline' : id + ':' + exp)
     if (esperado !== sig) return new Response('assinatura inválida', { status: 403 })
 
     const nome = (url.searchParams.get('name') || 'video.mp4').replace(/[\r\n"\\]/g, '')
@@ -89,7 +90,13 @@ export default {
       }
       const out = new Headers()
       out.set('Content-Type', r.headers.get('Content-Type') || 'video/mp4')
-      out.set('Content-Disposition', 'attachment; filename="' + nome + '"')
+      if (inline) {
+        // proxy leve pra tocar no player: cacheável (imutável) e liberado por CORS
+        out.set('Cache-Control', 'public, max-age=604800')
+        out.set('Access-Control-Allow-Origin', '*')
+      } else {
+        out.set('Content-Disposition', 'attachment; filename="' + nome + '"')
+      }
       const cl = r.headers.get('Content-Length'); if (cl) out.set('Content-Length', cl)
       const cr = r.headers.get('Content-Range'); if (cr) out.set('Content-Range', cr)
       out.set('Accept-Ranges', 'bytes')
