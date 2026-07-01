@@ -6,12 +6,9 @@ import { store } from '../data/store'
 import { CATEGORIAS, COPYS, type Card, type Categoria, type Copy } from '../types'
 import { semanaDeGravacao } from '../week'
 
-// proxy leve (1080p + áudio AAC, faststart) no Supabase Storage; quando existe, toca com som
-const SUPA = import.meta.env.VITE_SUPABASE_URL as string
-const proxyDe = (id: string) => `${SUPA}/storage/v1/object/public/proxies/${id}.mp4`
-// download via worker da Cloudflare (link assinado + só brutos): sem aviso de vírus, qualquer tamanho.
-// a prévia 4K continua vindo direto do Drive (iframe), só quando ainda não há versão leve.
+// download via worker da Cloudflare (link assinado): sem aviso de vírus, qualquer tamanho.
 const baixarUrl = (b: Bruto) => `/api/download-url?id=${b.id}&name=${encodeURIComponent(b.nome)}`
+// player: sempre o do próprio Drive (logado)
 const drivePreview = (id: string) => `https://drive.google.com/file/d/${id}/preview`
 
 const TIPOS: TipoBruto[] = ['boa', 'erro', 'gancho', 'complemento']
@@ -214,12 +211,6 @@ export default function Catalogo() {
     setBaixIdx(0)
   }
 
-  // estado do player
-  const [pronto, setPronto] = useState(false)
-  const [buff, setBuff] = useState(true)
-  const [vidErro, setVidErro] = useState(false)
-  // 'proxy' = versão leve com áudio; 'raw' = bruto 4K direto (mudo); 'checando' = decidindo
-  const [fonte, setFonte] = useState<'checando' | 'proxy' | 'raw'>('checando')
   // edição do nome
   const [editNome, setEditNome] = useState(false)
   const [nomeTmp, setNomeTmp] = useState('')
@@ -227,21 +218,11 @@ export default function Catalogo() {
   const [erroNome, setErroNome] = useState('')
 
   useEffect(() => {
-    setPronto(false)
-    setBuff(true)
-    setVidErro(false)
     setEditNome(false)
     setErroNome('')
     setLinkOpen(false)
     setBuscaCard('')
     setNovaTarefa('')
-    if (!aberto) { setFonte('checando'); return }
-    let vivo = true
-    setFonte('checando')
-    fetch(proxyDe(aberto.id), { method: 'GET', headers: { Range: 'bytes=0-0' } })
-      .then((r) => { if (vivo) setFonte(r.ok ? 'proxy' : 'raw') })
-      .catch(() => { if (vivo) setFonte('raw') })
-    return () => { vivo = false }
   }, [aberto?.id])
 
   // setas do teclado quando o player está aberto
@@ -469,67 +450,22 @@ export default function Catalogo() {
               )}
             </div>
             <div className="relative flex-1 min-h-0">
-              {fonte === 'checando' ? (
-                <div className="w-full h-full grid place-items-center rounded-xl bg-black">
-                  <div className="h-8 w-8 rounded-full border-[3px] border-white/25 border-t-white animate-spin" />
-                </div>
-              ) : fonte === 'proxy' ? (
-                <video
-                  key={aberto.id}
-                  src={proxyDe(aberto.id)}
-                  poster={aberto.thumb || undefined}
-                  controls
-                  autoPlay
-                  playsInline
-                  preload="metadata"
-                  className="w-full h-full object-contain rounded-xl bg-black"
-                  onLoadStart={() => { setPronto(false); setBuff(true); setVidErro(false) }}
-                  onCanPlay={(e) => { setPronto(true); setBuff(false); e.currentTarget.play().catch(() => {}) }}
-                  onPlaying={() => { setPronto(true); setBuff(false) }}
-                  onWaiting={() => setBuff(true)}
-                  onError={() => setVidErro(true)}
-                />
-              ) : (
-                // 4K bruto: toca direto do Drive (logado), sem passar pelo Vercel
-                <iframe
-                  key={aberto.id}
-                  src={drivePreview(aberto.id)}
-                  title={aberto.nome}
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                  className="w-full h-full rounded-xl bg-black border-0"
-                />
-              )}
-              {fonte === 'proxy' && !vidErro && (!pronto || buff) && (
-                <div className="absolute inset-0 grid place-items-center rounded-xl bg-black/45 pointer-events-none">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-8 w-8 rounded-full border-[3px] border-white/25 border-t-white animate-spin" />
-                    <span className="text-[12px] font-medium text-white/85">{pronto ? 'Bufferizando…' : 'Carregando…'}</span>
-                  </div>
-                </div>
-              )}
-              {vidErro && (
-                <div className="absolute inset-0 grid place-items-center rounded-xl bg-black/60 p-4 text-center">
-                  <div>
-                    <div className="text-[13px] font-semibold text-white mb-1">Não consegui carregar o vídeo</div>
-                    <div className="text-[12px] text-white/70 mb-3">Tente baixar para assistir.</div>
-                    <a href={baixarUrl(aberto)} className="inline-block text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5">Baixar vídeo</a>
-                  </div>
-                </div>
-              )}
-              {fonte !== 'checando' && temPrev && (
+              {/* player: sempre o do próprio Drive (logado) */}
+              <iframe
+                key={aberto.id}
+                src={drivePreview(aberto.id)}
+                title={aberto.nome}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                className="w-full h-full rounded-xl bg-black border-0"
+              />
+              {temPrev && (
                 <button onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
               )}
-              {fonte !== 'checando' && temNext && (
+              {temNext && (
                 <button onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
               )}
             </div>
-            {fonte === 'raw' && (
-              <div className="mt-2 flex items-center gap-1.5 text-[12px] text-muted">
-                <div className="h-3.5 w-3.5 rounded-full border-2 border-border-strong border-t-brand animate-spin shrink-0" />
-                <span>Tocando o 4K direto do Drive enquanto a versão leve é gerada.</span>
-              </div>
-            )}
             {(() => {
               const clA = classif[aberto.id]
               const proposto = clA?.ia_tipo || null
