@@ -29,10 +29,15 @@ function fmtDur(seg: number | null): string {
   return m + ':' + String(s).padStart(2, '0')
 }
 
-// pasta mês/dia derivada da data do vídeo (estilo Finder, sem mexer no Drive)
+// pasta mês/dia: usa a PASTA REAL do Drive (b.mes/b.dia) quando existir; senão, a data do vídeo
 const MESES_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-function mesDiaDe(criado?: string | null): { mes: string; dia: string; mesOrd: number; diaOrd: number } {
-  const d = criado ? new Date(criado) : null
+function mesDiaDe(b: Bruto): { mes: string; dia: string; mesOrd: number; diaOrd: number } {
+  if (b.mes && b.dia) {
+    const iMes = MESES_PT.findIndex((m) => b.mes!.startsWith(m))
+    const ano = parseInt((b.mes.match(/\d{4}/) || ['0'])[0], 10)
+    return { mes: b.mes, dia: b.dia, mesOrd: ano * 12 + (iMes >= 0 ? iMes : 0), diaOrd: parseInt(b.dia, 10) || 0 }
+  }
+  const d = b.criado ? new Date(b.criado) : null
   if (!d || isNaN(d.getTime())) return { mes: 'Sem data', dia: '—', mesOrd: -1, diaOrd: -1 }
   return {
     mes: MESES_PT[d.getMonth()] + ' ' + d.getFullYear(),
@@ -139,7 +144,7 @@ export default function Catalogo() {
   const arvore = useMemo(() => {
     const meses = new Map<string, { mes: string; mesOrd: number; dias: Map<string, { dia: string; diaOrd: number; videos: Bruto[] }> }>()
     for (const b of brutos || []) {
-      const { mes, dia, mesOrd, diaOrd } = mesDiaDe(b.criado)
+      const { mes, dia, mesOrd, diaOrd } = mesDiaDe(b)
       let m = meses.get(mes)
       if (!m) { m = { mes, mesOrd, dias: new Map() }; meses.set(mes, m) }
       let dd = m.dias.get(dia)

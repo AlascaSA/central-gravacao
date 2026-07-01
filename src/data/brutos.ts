@@ -5,6 +5,9 @@ export interface Bruto {
   seg: number | null
   thumb?: string | null
   criado?: string | null
+  /** Mês/dia da PASTA real no Drive (ex: "Junho 2026" / "26"). Quando vazio, usa a data. */
+  mes?: string | null
+  dia?: string | null
 }
 
 export async function listarBrutos(): Promise<Bruto[]> {
