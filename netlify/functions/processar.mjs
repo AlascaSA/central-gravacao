@@ -15,11 +15,11 @@ async function extrairTexto(buf, nome) {
   }
   if (lower.endsWith('.pdf')) {
     try {
-      const { PDFParse } = await import('pdf-parse')
-      const parser = new PDFParse({ data: new Uint8Array(buf) })
-      const r = await parser.getText()
-      try { await parser.destroy() } catch (_) { /* ignore */ }
-      return r.text || ''
+      // unpdf = pdfjs empacotado pra serverless (o pdf-parse/pdfjs normal falha no Netlify)
+      const { extractText, getDocumentProxy } = await import('unpdf')
+      const pdf = await getDocumentProxy(new Uint8Array(buf))
+      const { text } = await extractText(pdf, { mergePages: true })
+      return text || ''
     } catch (_) {
       return ''
     }

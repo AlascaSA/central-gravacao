@@ -9,8 +9,8 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  # libs com requires dinâmicos: enviadas como estão, sem empacotar
-  external_node_modules = ["mammoth", "pdf-parse", "google-auth-library"]
+  # libs com requires dinâmicos: enviadas como estão, sem empacotar (unpdf é empacotado normal)
+  external_node_modules = ["mammoth", "google-auth-library"]
 
 # /api/* → funções (mantém o frontend chamando /api/... sem mudança)
 [[redirects]]
