@@ -73,9 +73,11 @@ async function upsert(v, capa_url) {
   if (!r.ok) throw new Error('upsert ' + r.status + ' ' + (await r.text()).slice(0, 120))
 }
 
-// --pasta <id> = varre só aquela subárvore
+// --pasta <id ou link> = varre só aquela subárvore
 const iP = process.argv.indexOf('--pasta')
-const raizes = iP >= 0 && process.argv[iP + 1] ? [process.argv[iP + 1]] : undefined
+const pastaArg = iP >= 0 ? process.argv[iP + 1] : null
+const pastaId = pastaArg ? ((pastaArg.match(/folders\/([\w-]+)/) || [])[1] || (pastaArg.match(/[\w-]{20,}/) || [])[0] || pastaArg) : null
+const raizes = pastaId ? [pastaId] : undefined
 
 const token = await driveToken()
 const videos = await listarVideos(token, raizes)

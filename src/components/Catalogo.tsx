@@ -76,11 +76,14 @@ export default function Catalogo() {
   const [nav, setNav] = useState<{ mes: string | null; dia: string | null }>({ mes: null, dia: null })
   function irPara(mes: string | null, dia: string | null) { setNav({ mes, dia }); setIdx(null) }
   const [proc, setProc] = useState<'idle' | 'indo' | 'ok' | 'erro'>('idle')
-  async function processarNovos() {
+  const [pastaLink, setPastaLink] = useState('')
+  async function processarNovos(pasta?: string) {
     setProc('indo')
     try {
-      const r = await fetch('/api/processar-brutos', { method: 'POST' })
+      const url = '/api/processar-brutos' + (pasta ? '?pasta=' + encodeURIComponent(pasta) : '')
+      const r = await fetch(url, { method: 'POST' })
       setProc(r.ok ? 'ok' : 'erro')
+      if (r.ok && pasta) setPastaLink('')
     } catch {
       setProc('erro')
     }
@@ -295,19 +298,30 @@ export default function Catalogo() {
         {sel.size > 0 ? (
           <button onClick={() => setSel(new Set())} className="ml-auto text-[12px] font-medium text-muted hover:text-ink">Limpar seleção</button>
         ) : (
-          <button
-            onClick={processarNovos}
-            disabled={proc === 'indo'}
-            title="Gera versão leve + classificação dos vídeos novos (roda na nuvem)"
-            className={'ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors disabled:opacity-60 ' + (proc === 'erro' ? 'bg-red/10 border-red/30 text-red' : proc === 'ok' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-surface-2 border-border text-brand-2 hover:border-brand/50')}
-          >
-            {proc === 'indo' ? (
-              <span className="h-3.5 w-3.5 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
-            ) : (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" /></svg>
+          <div className="ml-auto flex items-center gap-1.5">
+            <input
+              value={pastaLink}
+              onChange={(e) => setPastaLink(e.target.value)}
+              placeholder="colar link de uma pasta…"
+              className="hidden sm:block w-44 text-[12px] bg-surface-2 border border-border rounded-lg px-2.5 py-1.5 text-ink-2 placeholder:text-muted focus:border-brand/50 outline-none"
+            />
+            {pastaLink.trim() && (
+              <button onClick={() => processarNovos(pastaLink.trim())} disabled={proc === 'indo'} className="shrink-0 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border bg-surface-2 border-border text-brand-2 hover:border-brand/50 disabled:opacity-60 transition-colors">Escanear pasta</button>
             )}
-            {proc === 'indo' ? 'Disparando…' : proc === 'ok' ? 'Disparado!' : proc === 'erro' ? 'Falhou' : 'Processar novos'}
-          </button>
+            <button
+              onClick={() => processarNovos()}
+              disabled={proc === 'indo'}
+              title="Gera capa + metadados dos vídeos novos (roda na nuvem)"
+              className={'shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors disabled:opacity-60 ' + (proc === 'erro' ? 'bg-red/10 border-red/30 text-red' : proc === 'ok' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-surface-2 border-border text-brand-2 hover:border-brand/50')}
+            >
+              {proc === 'indo' ? (
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" /></svg>
+              )}
+              {proc === 'indo' ? 'Disparando…' : proc === 'ok' ? 'Disparado!' : proc === 'erro' ? 'Falhou' : 'Processar novos'}
+            </button>
+          </div>
         )}
       </div>
 
