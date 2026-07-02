@@ -124,13 +124,6 @@ export default function App() {
     [contexto, filtro],
   )
 
-  const naJaylton = useMemo(() => ativosFiltrados.filter((c) => c.fase === 'para Jaylton gravar').length, [ativosFiltrados])
-  function irParaJaylton() {
-    // a coluna do Jaylton agora é a 2ª (logo após "A gravar") — rola pro começo do quadro
-    const el = boardRef.current
-    if (el) el.scrollTo({ left: 0, behavior: 'smooth' })
-  }
-
   const semanaParaNovos = vistaSem === 'semana' ? semMonday : nextMonday()
 
   async function handleMove(id: string, fase: Fase) {
@@ -215,8 +208,6 @@ export default function App() {
           counts={counts}
           selMode={selMode}
           onToggleSel={() => setSelMode((v) => !v)}
-          jaylton={naJaylton}
-          onJaylton={irParaJaylton}
           onSubir={() => setUploadOpen(true)}
           onNovo={() => abrirNovo(filtro === 'Todas' || filtro === 'Sem roteiro' ? undefined : filtro)}
         />
