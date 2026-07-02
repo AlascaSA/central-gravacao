@@ -36,3 +36,10 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
+
+      - name: Classificar com IA (transcrição + tipo) os que ainda não têm
+        run: node scripts/classificar-brutos.mjs
+        env:
+          GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SUPA_SECRET: ${{ secrets.SUPA_SECRET }}

@@ -1,6 +1,7 @@
 // Duas passadas: (1) transcreve todos os brutos com proxy; (2) classifica cada um vendo o
 // clipe ANTERIOR e o PRÓXIMO (pega regravação/erro x complemento). Grava no Supabase (tabela brutos).
 // Uso: GROQ_KEY=... SUPA_SECRET=... node scripts/classificar-brutos.mjs [--force]
+import { GoogleAuth } from 'google-auth-library'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,12 +11,20 @@ import { spawn } from 'node:child_process'
 const GROQ = process.env.GROQ_KEY
 const SECRET = process.env.SUPA_SECRET
 const SUPA = 'https://kkvuioyferqbilfwdkqa.supabase.co'
-const APP = 'https://central-gravacao.vercel.app'
+const KEY_PATH = '/Users/gcosta/Downloads/baixa-gravacoes-04ae892ee0e9.json'
 const FORCE = process.argv.includes('--force')
 const SO_TRANSC = process.argv.includes('--so-transcrever') // só transcreve; classificação vai via Claude
 const RECLASS = process.argv.includes('--reclassificar') // mantém transcrição, re-classifica tudo
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'classif-'))
 if (!GROQ || !SECRET) { console.error('faltou GROQ_KEY ou SUPA_SECRET'); process.exit(1) }
+
+// conta de serviço pra ler o proxy do DRIVE (antes moravam no Supabase; agora vivem na pasta __proxies__)
+const KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+  ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
+  : JSON.parse(fs.readFileSync(KEY_PATH, 'utf8'))
+const auth = new GoogleAuth({ credentials: KEY, scopes: ['https://www.googleapis.com/auth/drive.readonly'] })
+const client = await auth.getClient()
+const driveToken = async () => (await client.getAccessToken()).token
 
 const sb = (p, opts = {}) => fetch(`${SUPA}/rest/v1/${p}`, { ...opts, headers: { apikey: SECRET, Authorization: 'Bearer ' + SECRET, ...(opts.headers || {}) } })
 const jsonOf = async (r) => { try { return await r.json() } catch { return [] } }
@@ -30,19 +39,18 @@ function limparTransc(t) {
   return s
 }
 
+// brutos que já têm proxy no Drive, EM ORDEM DE GRAVAÇÃO (pra classificação ver os vizinhos/regravação)
 async function listarBrutos() {
-  const r = await fetch(`${APP}/api/brutos`)
-  return (await r.json()).videos || []
+  const rows = await jsonOf(await sb('brutos?select=drive_id,nome,duracao,proxy_id&proxy_id=not.is.null&order=criado.asc.nullslast'))
+  return (Array.isArray(rows) ? rows : []).map((b) => ({ id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id }))
 }
-async function proxiesExistentes() {
-  const r = await fetch(`${SUPA}/storage/v1/object/list/proxies`, { method: 'POST', headers: { apikey: SECRET, Authorization: 'Bearer ' + SECRET, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: '', limit: 1000 }) })
-  return new Set((await r.json()).map((o) => o.name.replace(/\.mp4$/, '')))
-}
-async function baixarProxy(id, dest) {
+// baixa o PROXY do Drive (alt=media com a conta de serviço)
+async function baixarProxy(proxyId, dest) {
   let ultErro
   for (let tent = 0; tent < 3; tent++) {
     try {
-      const r = await fetch(`${SUPA}/storage/v1/object/public/proxies/${id}.mp4`)
+      const token = await driveToken()
+      const r = await fetch(`https://www.googleapis.com/drive/v3/files/${proxyId}?alt=media&supportsAllDrives=true`, { headers: { Authorization: 'Bearer ' + token } })
       if (!r.ok || !r.body) throw new Error('proxy ' + r.status)
       await new Promise((res, rej) => { const ws = fs.createWriteStream(dest); Readable.fromWeb(r.body).pipe(ws).on('finish', res).on('error', rej) })
       return
@@ -111,15 +119,13 @@ async function upsert(row) {
 }
 
 // ---- run ----
-const brutos = await listarBrutos()
-const comProxy = await proxiesExistentes()
+const fila = await listarBrutos() // já vem só quem tem proxy, em ordem de gravação
 const existentes = await jsonOf(await sb('brutos?select=drive_id,transcricao,ia_tipo'))
 const exMap = new Map((Array.isArray(existentes) ? existentes : []).map((e) => [e.drive_id, e]))
 const exemplos = await jsonOf(await sb('brutos_exemplos?select=transcricao,duracao,tipo&order=criado_em.desc&limit=12'))
 const fewshot = Array.isArray(exemplos) ? exemplos : []
 
-const fila = brutos.filter((b) => comProxy.has(b.id))
-console.log(`${brutos.length} brutos, ${comProxy.size} com proxy → ${fila.length} na fila, ${exMap.size} já no banco`)
+console.log(`${fila.length} brutos com proxy na fila, ${exMap.size} já no banco`)
 
 // PASSA 1: transcrição
 const itens = []
@@ -131,7 +137,7 @@ for (const b of fila) {
     const tmp = path.join(TMP, b.id + '.mp4')
     try {
       process.stdout.write(`• ${b.nome} transcrevendo… `)
-      await baixarProxy(b.id, tmp)
+      await baixarProxy(b.proxyId, tmp)
       transc = await transcrever(tmp)
       await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, atualizado_em: new Date().toISOString() })
       console.log(transc ? `"${transc.slice(0, 50)}${transc.length > 50 ? '…' : ''}"` : '(silêncio)')
