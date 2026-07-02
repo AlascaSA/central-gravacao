@@ -126,8 +126,9 @@ export default function App() {
 
   const naJaylton = useMemo(() => ativosFiltrados.filter((c) => c.fase === 'para Jaylton gravar').length, [ativosFiltrados])
   function irParaJaylton() {
+    // a coluna do Jaylton agora é a 2ª (logo após "A gravar") — rola pro começo do quadro
     const el = boardRef.current
-    if (el) el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' })
+    if (el) el.scrollTo({ left: 0, behavior: 'smooth' })
   }
 
   const semanaParaNovos = vistaSem === 'semana' ? semMonday : nextMonday()

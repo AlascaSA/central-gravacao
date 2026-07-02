@@ -1,4 +1,4 @@
-export const FASES = ['A gravar', 'A editar', 'Em edição', 'Finalizado', 'No tráfego', 'para Jaylton gravar'] as const
+export const FASES = ['A gravar', 'para Jaylton gravar', 'A editar', 'Em edição', 'Finalizado', 'No tráfego'] as const
 export type Fase = (typeof FASES)[number]
 
 // Copywriters. "Sem roteiro" NÃO é copy — virou um marcador à parte (campo semRoteiro),
