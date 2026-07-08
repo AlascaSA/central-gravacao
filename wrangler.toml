@@ -1,0 +1,5 @@
+# Config do Cloudflare Pages (o site + as funções /api). O worker de download tem o seu próprio em worker/.
+name = "central-gravacao"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
