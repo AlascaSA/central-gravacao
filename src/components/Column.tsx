@@ -16,6 +16,7 @@ export default function Column({
   fase,
   cards,
   arrastando,
+  semanaVista,
   onArchive,
   onPushSemana,
   onDelete,
@@ -26,6 +27,7 @@ export default function Column({
   fase: Fase
   cards: Card[]
   arrastando?: boolean
+  semanaVista?: string | null
   onArchive: (id: string) => void
   onPushSemana?: (id: string) => void
   onDelete?: (id: string) => void
@@ -55,7 +57,7 @@ export default function Column({
           ? arrastando && (
               <div className="grid place-items-center text-[12px] text-muted py-9 rounded-xl border border-dashed border-brand/40">solte aqui</div>
             )
-          : cards.map((card, i) => <DraggableCard key={card.id} card={card} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} index={i} selecionado={selecionados?.has(card.id)} onToggleSel={onToggleSel} />)}
+          : cards.map((card, i) => <DraggableCard key={card.id} card={card} semanaVista={semanaVista} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} index={i} selecionado={selecionados?.has(card.id)} onToggleSel={onToggleSel} />)}
       </div>
     </section>
   )

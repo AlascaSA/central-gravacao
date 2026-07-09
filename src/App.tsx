@@ -28,7 +28,6 @@ export default function App() {
   const [selMode, setSelMode] = useState(false)
   const sigRef = useRef('')
   const abriuLinkRef = useRef(false)
-  const weekInitRef = useRef(false)
   const boardRef = useRef<HTMLDivElement>(null)
   // exclusões com "Desfazer": some da tela na hora, efetiva no banco depois de 5s
   const [pendingDel, setPendingDel] = useState<{ id: string; titulo: string }[]>([])
@@ -87,25 +86,22 @@ export default function App() {
     if (c) { setDetailCard(c); abriuLinkRef.current = true }
   }, [cards])
 
-  // ao abrir, cai na semana mais recente que TEM cards — não numa semana nova vazia (só na 1ª carga)
-  useEffect(() => {
-    if (weekInitRef.current || cards.length === 0) return
-    weekInitRef.current = true
-    const cur = currentMonday()
-    const semanas = [...new Set(cards.filter((c) => !c.arquivado && c.semana).map((c) => c.semana as string))]
-    if (semanas.length === 0 || semanas.includes(cur)) return // atual já tem trabalho (ou não há semanas)
-    const passadas = semanas.filter((s) => s <= cur).sort()
-    setSemMonday(passadas.length ? passadas[passadas.length - 1] : [...semanas].sort()[0])
-  }, [cards])
-
   const ativos = useMemo(() => cards.filter((c) => !c.arquivado && !pendingDel.some((p) => p.id === c.id)), [cards, pendingDel])
   const arquivados = useMemo(() => cards.filter((c) => c.arquivado), [cards])
 
-  // filtra pela semana selecionada
+  // filtra pela semana selecionada, COM rollover: o não concluído de semanas passadas rola pra semana atual
   const daSemana = useMemo(() => {
     if (vistaSem === 'todas') return ativos
     if (vistaSem === 'sem') return ativos.filter((c) => !c.semana)
-    return ativos.filter((c) => c.semana === semMonday)
+    const cur = currentMonday()
+    const concluida = (c: Card) => c.fase === 'Finalizado' || c.fase === 'No tráfego'
+    if (semMonday === cur) {
+      // semana atual: o que é desta semana + o NÃO concluído que sobrou de semanas passadas (rolou pra cá)
+      return ativos.filter((c) => c.semana === semMonday || (!!c.semana && c.semana < semMonday && !concluida(c)))
+    }
+    if (semMonday > cur) return ativos.filter((c) => c.semana === semMonday) // semana futura: só o planejado
+    // semana passada: só o que ficou nela (concluído); o não concluído já rolou pra frente
+    return ativos.filter((c) => c.semana === semMonday && concluida(c))
   }, [ativos, vistaSem, semMonday])
 
   // categoria + urgência aplicadas antes da copy, pra as contagens de copy refletirem esses filtros
@@ -231,7 +227,7 @@ export default function App() {
         </div>
       ) : vista === 'quadro' ? (
         <div className="flex-1 min-h-0">
-          <Board cards={ativosFiltrados} selMode={selMode} scrollRef={boardRef} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
+          <Board cards={ativosFiltrados} selMode={selMode} scrollRef={boardRef} semanaVista={vistaSem === 'semana' ? semMonday : null} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">

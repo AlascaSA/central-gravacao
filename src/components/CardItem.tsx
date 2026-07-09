@@ -46,6 +46,7 @@ export function CardView({
   dragProps,
   selecionado,
   onToggleSel,
+  semanaVista,
 }: {
   card: Card
   onArchive: (id: string) => void
@@ -59,6 +60,7 @@ export function CardView({
   dragProps?: Record<string, unknown>
   selecionado?: boolean
   onToggleSel?: (id: string) => void
+  semanaVista?: string | null
 }) {
   const podeConcluir = card.fase === 'Finalizado' || card.fase === 'No tráfego'
   const [confirmar, setConfirmar] = useState(false)
@@ -99,6 +101,12 @@ export function CardView({
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        {semanaVista && card.semana && card.semana !== semanaVista && (
+          <span title={'Veio da semana de ' + card.semana} className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 bg-amber-500/12 rounded-full px-2 py-0.5">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h11a4 4 0 0 1 4 4v3" /></svg>
+            {card.semana.slice(8, 10)}/{card.semana.slice(5, 7)}
+          </span>
+        )}
         {card.copy && <span className={chipNeutro}>{card.copy}</span>}
         {card.categoria && (
           <span className={chipNeutro}>
@@ -227,6 +235,7 @@ export default function DraggableCard({
   index,
   selecionado,
   onToggleSel,
+  semanaVista,
 }: {
   card: Card
   onArchive: (id: string) => void
@@ -236,6 +245,7 @@ export default function DraggableCard({
   index?: number
   selecionado?: boolean
   onToggleSel?: (id: string) => void
+  semanaVista?: string | null
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id })
   return (
@@ -251,6 +261,7 @@ export default function DraggableCard({
       dragProps={{ ...attributes, ...listeners }}
       selecionado={selecionado}
       onToggleSel={onToggleSel}
+      semanaVista={semanaVista}
     />
   )
 }

@@ -18,6 +18,7 @@ export default function Board({
   cards,
   selMode,
   scrollRef,
+  semanaVista,
   onMove,
   onArchive,
   onPushSemana,
@@ -27,6 +28,7 @@ export default function Board({
   cards: Card[]
   selMode?: boolean
   scrollRef: RefObject<HTMLDivElement | null>
+  semanaVista?: string | null
   onMove: (id: string, fase: Fase) => void
   onArchive: (id: string) => void
   onPushSemana?: (id: string) => void
@@ -145,7 +147,7 @@ export default function Board({
           className="scroll-quadro flex items-start gap-5 sm:gap-6 h-full overflow-auto px-4 sm:px-6 pt-4 pb-24 sm:pb-6"
         >
           {FASES.map((fase) => (
-            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={selMode ? toggleSel : undefined} />
+            <Column key={fase} fase={fase} arrastando={activeId != null} cards={cards.filter((c) => c.fase === fase)} semanaVista={semanaVista} onArchive={onArchive} onPushSemana={onPushSemana} onDelete={onDelete} onOpen={onOpen} selecionados={sel} onToggleSel={selMode ? toggleSel : undefined} />
           ))}
         </div>
       </div>
