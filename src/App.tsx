@@ -28,6 +28,7 @@ export default function App() {
   const [selMode, setSelMode] = useState(false)
   const sigRef = useRef('')
   const abriuLinkRef = useRef(false)
+  const weekInitRef = useRef(false)
   const boardRef = useRef<HTMLDivElement>(null)
   // exclusões com "Desfazer": some da tela na hora, efetiva no banco depois de 5s
   const [pendingDel, setPendingDel] = useState<{ id: string; titulo: string }[]>([])
@@ -84,6 +85,17 @@ export default function App() {
     if (!id) { abriuLinkRef.current = true; return }
     const c = cards.find((x) => x.id === id)
     if (c) { setDetailCard(c); abriuLinkRef.current = true }
+  }, [cards])
+
+  // ao abrir, cai na semana mais recente que TEM cards — não numa semana nova vazia (só na 1ª carga)
+  useEffect(() => {
+    if (weekInitRef.current || cards.length === 0) return
+    weekInitRef.current = true
+    const cur = currentMonday()
+    const semanas = [...new Set(cards.filter((c) => !c.arquivado && c.semana).map((c) => c.semana as string))]
+    if (semanas.length === 0 || semanas.includes(cur)) return // atual já tem trabalho (ou não há semanas)
+    const passadas = semanas.filter((s) => s <= cur).sort()
+    setSemMonday(passadas.length ? passadas[passadas.length - 1] : [...semanas].sort()[0])
   }, [cards])
 
   const ativos = useMemo(() => cards.filter((c) => !c.arquivado && !pendingDel.some((p) => p.id === c.id)), [cards, pendingDel])
