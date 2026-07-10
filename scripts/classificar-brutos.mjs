@@ -39,10 +39,22 @@ function limparTransc(t) {
   return s
 }
 
-// brutos que já têm proxy no Drive, EM ORDEM DE GRAVAÇÃO (pra classificação ver os vizinhos/regravação)
+// número do clipe da câmera (C0106 → 106) — usado pra ordenar na sequência real de gravação
+function numDoNome(nome) {
+  const s = (nome || '').trim()
+  const m = s.match(/^C0*(\d+)/i) || s.match(/^0*(\d+)/)
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER
+}
+// brutos que já têm proxy no Drive, EM ORDEM DE GRAVAÇÃO (número do clipe, não a data do upload) —
+// a classificação vê o vizinho anterior/próximo pra pegar regravação, então a ordem tem que ser a sequência real.
 async function listarBrutos() {
-  const rows = await jsonOf(await sb('brutos?select=drive_id,nome,duracao,proxy_id&proxy_id=not.is.null&order=criado.asc.nullslast'))
-  return (Array.isArray(rows) ? rows : []).map((b) => ({ id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id }))
+  const rows = await jsonOf(await sb('brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado&proxy_id=not.is.null'))
+  const arr = (Array.isArray(rows) ? rows : []).map((b) => ({
+    id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id,
+    num: numDoNome(b.nome_original || b.nome), criado: b.criado || '',
+  }))
+  arr.sort((a, b) => (a.num - b.num) || a.criado.localeCompare(b.criado))
+  return arr
 }
 // baixa o PROXY do Drive (alt=media com a conta de serviço)
 async function baixarProxy(proxyId, dest) {

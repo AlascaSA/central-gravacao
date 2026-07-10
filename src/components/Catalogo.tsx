@@ -26,6 +26,14 @@ function fmtDur(seg: number | null): string {
   return m + ':' + String(s).padStart(2, '0')
 }
 
+// número do clipe da câmera (C0106 → 106, ou "06.mp4" → 6) pra ordenar na sequência de gravação.
+// Nome renomeado (sem número no começo) vai pro fim.
+function numDoClipe(nome: string): number {
+  const s = (nome || '').trim()
+  const m = s.match(/^C0*(\d+)/i) || s.match(/^0*(\d+)/)
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER
+}
+
 // pasta mês/dia: usa a PASTA REAL do Drive (b.mes/b.dia) quando existir; senão, a data do vídeo
 const MESES_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 function mesDiaDe(b: Bruto): { mes: string; dia: string; mesOrd: number; diaOrd: number } {
@@ -177,6 +185,8 @@ export default function Catalogo() {
       if (!dd) { dd = { dia, diaOrd, videos: [] }; m.dias.set(dia, dd) }
       dd.videos.push(b)
     }
+    // dentro de cada dia, ordena pela sequência do número do clipe (não pela data do upload)
+    for (const m of meses.values()) for (const d of m.dias.values()) d.videos.sort((a, b) => numDoClipe(a.nome) - numDoClipe(b.nome))
     return [...meses.values()].sort((a, b) => b.mesOrd - a.mesOrd)
   }, [brutos])
 
@@ -198,7 +208,7 @@ export default function Catalogo() {
       if (fProduto && produtoDoBruto(b) !== fProduto) return false
       if (fSemana && semanaDoBruto(b) !== fSemana) return false
       return true
-    })
+    }).sort((a, b) => numDoClipe(a.nome) - numDoClipe(b.nome))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brutos, classif, cards, fTipo, fProduto, fSemana])
 
