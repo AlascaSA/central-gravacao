@@ -7,6 +7,10 @@ on:
       pasta:
         description: "id ou link de uma pasta pra escanear só ela (vazio = varre tudo)"
         required: false
+      reclassificar:
+        description: "true = re-classifica TODOS na ordem certa do número (mantém a transcrição)"
+        required: false
+        default: "false"
 
 jobs:
   processar:
@@ -37,8 +41,8 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
 
-      - name: Classificar com IA (transcrição + tipo) os que ainda não têm
-        run: node scripts/classificar-brutos.mjs
+      - name: Classificar com IA (transcrição + tipo)
+        run: node scripts/classificar-brutos.mjs ${{ inputs.reclassificar == 'true' && '--reclassificar' || '' }}
         env:
           GROQ_KEY: ${{ secrets.GROQ_KEY }}
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
