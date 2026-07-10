@@ -113,6 +113,23 @@ async function classificar(atual, dur, prev, next, exemplos) {
   }
 }
 
+// título curto (3-6 palavras) só pra nomear — usado no backfill de sugestao_titulo dos "boa"
+async function tituloCurto(transc) {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + GROQ, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile', temperature: 0.2, response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'Gere um título curto (3 a 6 palavras) que resuma o assunto do vídeo, pra nomear o arquivo. Responda só JSON {"titulo":"..."}.' },
+        { role: 'user', content: String(transc || '').slice(0, 4000) },
+      ],
+    }),
+  })
+  if (!r.ok) return ''
+  const d = await r.json()
+  try { return (JSON.parse(d.choices[0].message.content).titulo || '').trim() } catch { return '' }
+}
+
 async function upsert(row) {
   const r = await sb('brutos', { method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([row]) })
   if (!r.ok) throw new Error('upsert ' + r.status + ' ' + (await r.text()).slice(0, 150))
@@ -169,6 +186,21 @@ for (let i = 0; i < itens.length; i++) {
     console.log(`✓ ${b.nome} → ${c.tipo} (${c.confianca})`)
   } catch (e) { console.log(`✗ ${b.nome} ERRO: ${e.message}`) }
 }
+}
+// backfill: "boa" (proposto ou confirmado) com transcrição mas sem sugestao_titulo
+// (classificados antes do campo existir) — 1 chamada Groq "só título", sem re-classificar
+if (!SO_TRANSC) {
+  const semTit = await jsonOf(await sb('brutos?select=drive_id,nome,transcricao&or=(ia_tipo.eq.boa,tipo.eq.boa)&sugestao_titulo.is.null'))
+  const alvoTit = (Array.isArray(semTit) ? semTit : []).filter((x) => x.transcricao && x.transcricao.trim())
+  if (alvoTit.length) {
+    console.log(`--- backfill de título em ${alvoTit.length} "boa" ---`)
+    for (const x of alvoTit) {
+      try {
+        const t = await tituloCurto(x.transcricao)
+        if (t) { await upsert({ drive_id: x.drive_id, sugestao_titulo: t }); console.log(`  ${x.nome} → ${t}`) }
+      } catch (e) { console.log(`  ${x.nome} erro: ${e.message}`) }
+    }
+  }
 }
 fs.rmSync(TMP, { recursive: true, force: true })
 console.log('fim')
