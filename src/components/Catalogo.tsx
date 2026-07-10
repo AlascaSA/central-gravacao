@@ -250,6 +250,7 @@ export default function Catalogo() {
   const [prevUrl, setPrevUrl] = useState<string | null>(null)
   const [prevErro, setPrevErro] = useState(false)
   const [avisoNome, setAvisoNome] = useState('')
+  const [sugTitulo, setSugTitulo] = useState<string | null>(null) // título editável da proposta SR
 
   useEffect(() => {
     setEditNome(false)
@@ -257,6 +258,7 @@ export default function Catalogo() {
     setLinkOpen(false)
     setBuscaCard('')
     setNovaTarefa('')
+    setSugTitulo(null)
   }, [aberto?.id])
 
   // busca a URL da versão leve (proxy) ao abrir um vídeo que já a tem; erro cai no iframe do Drive
@@ -593,16 +595,20 @@ export default function Catalogo() {
                         const sugere = ehBoa && !clA?.card_id && !clA?.sugestao_rejeitada && !!clA?.sugestao_titulo
                         return (
                           <div className="flex flex-col gap-2">
-                            {sugere && (
-                              <div className="rounded-lg border border-brand/30 bg-brand/8 p-2.5">
-                                <div className="text-[11px] font-bold uppercase tracking-wide text-brand-2 mb-1">IA sugeriu um card</div>
-                                <div className="text-[13px] font-semibold mb-2">SR - {clA!.sugestao_titulo}</div>
-                                <div className="flex items-center gap-2">
-                                  <button disabled={ligando} onClick={() => aprovarSugestao(clA!.sugestao_titulo!)} className="text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5 disabled:opacity-50">Aprovar</button>
-                                  <button onClick={() => rejeitarSug(aberto.id)} className="text-[12px] font-medium text-muted hover:text-rose-300 px-2">Rejeitar</button>
+                            {sugere && (() => {
+                              const tituloEdit = sugTitulo ?? (clA!.sugestao_titulo || '')
+                              return (
+                                <div className="rounded-lg border border-brand/30 bg-brand/8 p-2.5">
+                                  <div className="text-[11px] font-bold uppercase tracking-wide text-brand-2 mb-1.5">IA sugeriu um card — edite se quiser</div>
+                                  <input value={tituloEdit} onChange={(e) => setSugTitulo(e.target.value)} className="w-full h-9 px-3 rounded-lg bg-surface border border-border text-[13px] text-ink outline-none focus:border-brand/60 mb-1" />
+                                  <div className="text-[11px] text-muted mb-2">Vídeo no Drive: <span className="text-ink-2 font-medium">SR - {tituloEdit.trim() || '…'}</span></div>
+                                  <div className="flex items-center gap-2">
+                                    <button disabled={ligando || !tituloEdit.trim()} onClick={() => aprovarSugestao(tituloEdit.trim())} className="text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5 disabled:opacity-50">Aprovar</button>
+                                    <button onClick={() => rejeitarSug(aberto.id)} className="text-[12px] font-medium text-muted hover:text-rose-300 px-2">Rejeitar</button>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )
+                            })()}
                             <button onClick={() => setLinkOpen(true)} className="self-start text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">+ Ligar a uma tarefa</button>
                           </div>
                         )
