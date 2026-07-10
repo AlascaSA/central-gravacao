@@ -87,7 +87,7 @@ const REGRAS = 'Categorias: "boa" (tomada limpa e usável de conteúdo), "erro" 
 
 async function classificar(atual, dur, prev, next, exemplos) {
   const fewshot = exemplos.length ? '\n\nExemplos confirmados por humano (aprenda):\n' + exemplos.map((e) => `dur ${e.duracao ?? '?'}s "${(e.transcricao || '(silêncio)').slice(0, 80)}" => ${e.tipo}`).join('\n') : ''
-  const sys = `Você classifica brutos de vídeo de um criador jurídico (Direito Empresarial), na ordem de gravação. ${REGRAS} Responda SÓ JSON: {tipo, tema, tags (array curto), resumo (1 frase), confianca (0-1), motivo (curto)}.`
+  const sys = `Você classifica brutos de vídeo de um criador jurídico (Direito Empresarial), na ordem de gravação. ${REGRAS} Responda SÓ JSON: {tipo, tema, tags (array curto), resumo (1 frase), confianca (0-1), motivo (curto), titulo (título curto de 3 a 6 palavras que resuma o assunto pra nomear o arquivo)}.`
   const user = `Clipe ANTERIOR: ${prev ? `"${prev.slice(0, 220)}"` : '(nenhum)'}\n` +
     `Clipe PRÓXIMO: ${next ? `"${next.slice(0, 220)}"` : '(nenhum)'}\n` +
     `Clipe ATUAL — duração ${dur ?? '?'}s, transcrição: ${atual ? `"${atual}"` : '(silêncio / sem fala)'}${fewshot}`
@@ -163,6 +163,7 @@ for (let i = 0; i < itens.length; i++) {
       ia_tipo: tipos.includes(c.tipo) ? c.tipo : 'erro', ia_tema: c.tema || null,
       ia_tags: Array.isArray(c.tags) ? c.tags : null, ia_resumo: c.resumo || null,
       ia_confianca: typeof c.confianca === 'number' ? c.confianca : null, ia_motivo: c.motivo || null,
+      sugestao_titulo: (c.titulo && String(c.titulo).trim()) || null,
       atualizado_em: new Date().toISOString(),
     })
     console.log(`✓ ${b.nome} → ${c.tipo} (${c.confianca})`)

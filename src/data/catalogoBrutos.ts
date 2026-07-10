@@ -13,6 +13,8 @@ export interface Classificacao {
   tipo: TipoBruto | null // confirmado pelo humano
   confirmado: boolean
   card_id: string | null // tarefa ligada
+  sugestao_titulo: string | null // título curto que a IA gerou (pra proposta de card SR)
+  sugestao_rejeitada: boolean | null // humano dispensou a proposta
 }
 
 export interface BrutoLigado {
@@ -28,7 +30,7 @@ export async function listarClassificacoes(): Promise<Record<string, Classificac
   if (!supabase) return {}
   const { data, error } = await supabase
     .from('brutos')
-    .select('drive_id,transcricao,ia_tipo,ia_tema,ia_resumo,ia_confianca,ia_motivo,tipo,confirmado,card_id')
+    .select('drive_id,transcricao,ia_tipo,ia_tema,ia_resumo,ia_confianca,ia_motivo,tipo,confirmado,card_id,sugestao_titulo,sugestao_rejeitada')
   if (error || !data) return {}
   const map: Record<string, Classificacao> = {}
   for (const r of data) map[(r as Classificacao).drive_id] = r as Classificacao
@@ -77,4 +79,26 @@ export async function confirmarTipo(
     { onConflict: 'drive_id' },
   )
   await supabase.from('brutos_exemplos').insert({ transcricao, duracao, tipo })
+}
+
+// Renomeia o bruto no Drive conforme o card ligado (ou reverte ao desligar). Server-side.
+// Devolve o novo nome, ou null se falhou.
+export async function batizar(drive_id: string): Promise<string | null> {
+  try {
+    const r = await fetch('/api/bruto-batizar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drive_id }),
+    })
+    const d = await r.json().catch(() => ({}))
+    return r.ok ? (d.nome ?? null) : null
+  } catch {
+    return null
+  }
+}
+
+// Rejeita a sugestão de card SR da IA (some do Catálogo).
+export async function rejeitarSugestao(drive_id: string): Promise<void> {
+  if (!supabase) return
+  await supabase.from('brutos').upsert({ drive_id, sugestao_rejeitada: true }, { onConflict: 'drive_id' })
 }

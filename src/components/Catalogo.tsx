@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
-import { listarClassificacoes, confirmarTipo, ligarBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
+import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
 import { store } from '../data/store'
 import { CATEGORIAS, COPYS, type Card, type Categoria, type Copy } from '../types'
 import { semanaDeGravacao } from '../week'
@@ -104,12 +104,20 @@ export default function Catalogo() {
     setClassif((m) => ({ ...m, [id]: { ...(m[id] || { drive_id: id }), card_id: cardId } as Classificacao }))
     setLinkOpen(false)
     await ligarBruto(id, cardId, nome).catch(() => {})
+    const novo = await batizar(id)
+    if (novo) {
+      setBrutos((bs) => (bs ? bs.map((b) => (b.id === id ? { ...b, nome: novo } : b)) : bs))
+      setAvisoNome('Renomeado: ' + novo)
+      setTimeout(() => setAvisoNome(''), 4000)
+    }
   }
   async function desligar() {
     if (!aberto) return
     const id = aberto.id
     setClassif((m) => ({ ...m, [id]: { ...(m[id] || { drive_id: id }), card_id: null } as Classificacao }))
     await ligarBruto(id, null).catch(() => {})
+    const novo = await batizar(id)
+    if (novo) setBrutos((bs) => (bs ? bs.map((b) => (b.id === id ? { ...b, nome: novo } : b)) : bs))
   }
   async function criarELigar() {
     const t = novaTarefa.trim()
@@ -126,6 +134,24 @@ export default function Catalogo() {
     } finally {
       setLigando(false)
     }
+  }
+
+  // aprova a sugestão de card SR da IA: cria o card (sem roteiro, em "A editar"), liga e batiza
+  async function aprovarSugestao(titulo: string) {
+    if (!aberto || ligando) return
+    setLigando(true)
+    try {
+      const semana = aberto.criado ? semanaDeGravacao(new Date(aberto.criado)) : undefined
+      const card = await store.createCard({ semRoteiro: true, titulo, categoria: 'Conteúdo', fase: 'A editar', semana })
+      setCards((cs) => [card, ...cs])
+      await ligar(card.id)
+    } finally {
+      setLigando(false)
+    }
+  }
+  async function rejeitarSug(id: string) {
+    setClassif((m) => ({ ...m, [id]: { ...(m[id] || { drive_id: id }), sugestao_rejeitada: true } as Classificacao }))
+    await rejeitarSugestao(id).catch(() => {})
   }
 
   async function confirmar(b: Bruto, tipo: TipoBruto) {
@@ -223,6 +249,7 @@ export default function Catalogo() {
   // player: URL assinada da versão leve (proxy). null enquanto carrega; prevErro cai no iframe do Drive.
   const [prevUrl, setPrevUrl] = useState<string | null>(null)
   const [prevErro, setPrevErro] = useState(false)
+  const [avisoNome, setAvisoNome] = useState('')
 
   useEffect(() => {
     setEditNome(false)
@@ -481,6 +508,7 @@ export default function Catalogo() {
               )}
             </div>
             <div className="relative flex-1 min-h-0">
+              {avisoNome && <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 text-[12px] font-semibold text-emerald-300 bg-black/75 rounded-full px-3 py-1">{avisoNome}</div>}
               {/* player: versão leve (proxy) quando existe — instantâneo, sem "processando"; senão, o do Drive */}
               {aberto.temProxy && !prevErro ? (
                 prevUrl ? (
@@ -561,7 +589,23 @@ export default function Catalogo() {
                         )
                       }
                       if (!linkOpen) {
-                        return <button onClick={() => setLinkOpen(true)} className="text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">+ Ligar a uma tarefa</button>
+                        const ehBoa = (clA?.tipo || clA?.ia_tipo) === 'boa'
+                        const sugere = ehBoa && !clA?.card_id && !clA?.sugestao_rejeitada && !!clA?.sugestao_titulo
+                        return (
+                          <div className="flex flex-col gap-2">
+                            {sugere && (
+                              <div className="rounded-lg border border-brand/30 bg-brand/8 p-2.5">
+                                <div className="text-[11px] font-bold uppercase tracking-wide text-brand-2 mb-1">IA sugeriu um card</div>
+                                <div className="text-[13px] font-semibold mb-2">SR - {clA!.sugestao_titulo}</div>
+                                <div className="flex items-center gap-2">
+                                  <button disabled={ligando} onClick={() => aprovarSugestao(clA!.sugestao_titulo!)} className="text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5 disabled:opacity-50">Aprovar</button>
+                                  <button onClick={() => rejeitarSug(aberto.id)} className="text-[12px] font-medium text-muted hover:text-rose-300 px-2">Rejeitar</button>
+                                </div>
+                              </div>
+                            )}
+                            <button onClick={() => setLinkOpen(true)} className="self-start text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">+ Ligar a uma tarefa</button>
+                          </div>
+                        )
                       }
                       const filtradas = cards.filter((c) => !c.arquivado && (c.titulo + ' ' + (c.copy || '') + ' ' + (c.campanha || '')).toLowerCase().includes(buscaCard.toLowerCase())).slice(0, 8)
                       return (
