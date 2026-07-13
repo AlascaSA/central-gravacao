@@ -71,7 +71,7 @@ async function nomeIALote(env, arquivos) {
 
 // --- Supabase (service key) ---
 async function sbGet(env, q) { const r = await fetch(`${SUPA}/rest/v1/${q}`, { headers: { apikey: env.SUPA_SECRET, Authorization: 'Bearer ' + env.SUPA_SECRET } }); try { return await r.json() } catch { return [] } }
-async function sbUpsertMany(env, rows) { if (!rows.length) return; const r = await fetch(`${SUPA}/rest/v1/editados`, { method: 'POST', headers: { apikey: env.SUPA_SECRET, Authorization: 'Bearer ' + env.SUPA_SECRET, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); if (!r.ok) throw new Error('upsert ' + r.status) }
+async function sbUpsertMany(env, rows) { if (!rows.length) return; const r = await fetch(`${SUPA}/rest/v1/editados`, { method: 'POST', headers: { apikey: env.SUPA_SECRET, Authorization: 'Bearer ' + env.SUPA_SECRET, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); if (!r.ok) throw new Error('upsert ' + r.status + ' ' + (await r.text()).slice(0, 200)) }
 
 async function sincronizar(env) {
   const token = await googleToken(env)
@@ -96,13 +96,14 @@ async function sincronizar(env) {
     chunk.forEach((v, j) => nomes.set(v.id, res[j]))
   }
   const now = new Date().toISOString()
-  const rows = todos.map((v) => {
+  const porId = new Map() // dedup por drive_id (evita "affect row twice" no upsert)
+  for (const v of todos) {
     const row = { drive_id: v.id, nome_arquivo: v.name, secao: v.secao, thumb: v.hasThumbnail ? v.thumbnailLink : null, criado: v.createdTime || null, atualizado_em: now }
     const n = nomes.get(v.id)
     if (n) { row.nome_ia = n.nome; row.descricao = n.descricao }
-    return row
-  })
-  await sbUpsertMany(env, rows) // 1 upsert em vez de 1 por vídeo
+    porId.set(v.id, row)
+  }
+  await sbUpsertMany(env, [...porId.values()]) // 1 upsert só
   return { novos: novos.length, total: todos.length }
 }
 
