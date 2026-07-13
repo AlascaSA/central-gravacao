@@ -48,25 +48,30 @@ const ehVid = (f) => (f.mimeType || '').includes('video')
 async function vidsDe(token, fid, acc = [], depth = 0) { for (const f of await ls(token, fid)) { if (ehVid(f)) acc.push(f); else if (ehDir(f) && depth < 4) await vidsDe(token, f.id, acc, depth + 1) } return acc }
 function mesAno(nome) { const m = (nome || '').match(/^(\p{L}+)\s*\|\s*(\d{4})/u); if (!m) return null; const mi = MESES.findIndex((x) => x.toLowerCase() === m[1].toLowerCase()); return mi >= 0 ? { ano: Number(m[2]), mes: mi } : null }
 
-// --- Groq: nome limpo + descrição a partir do nome do arquivo ---
-async function nomeIA(env, nomeArquivo) {
+// --- Groq: nomeia um LOTE de arquivos numa chamada só (Cloudflare limita subrequests por invocação) ---
+async function nomeIALote(env, arquivos) {
+  const vazio = arquivos.map(() => ({ nome: null, descricao: null }))
   try {
+    const lista = arquivos.map((n, i) => `${i}: ${n}`).join('\n')
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST', headers: { Authorization: 'Bearer ' + env.GROQ_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'llama-3.3-70b-versatile', temperature: 0.2, response_format: { type: 'json_object' }, messages: [
-        { role: 'system', content: 'Você recebe o NOME DE ARQUIVO de um vídeo jurídico já editado (Direito Empresarial/Sucessório). Devolva SÓ JSON {nome (título curto e limpo, SEM códigos/prefixos como [SHORT], CONTEÚDO, VÍDEO, números ou ano — só o assunto), descricao (1 frase curta do que o vídeo trata)}.' },
-        { role: 'user', content: String(nomeArquivo || '').slice(0, 300) },
+        { role: 'system', content: 'Você recebe uma LISTA de nomes de arquivo de vídeos jurídicos editados (Direito Empresarial/Sucessório), um por linha no formato "indice: nome". Devolva SÓ JSON {itens:[{i (o índice), nome (título curto e limpo, SEM códigos/prefixos como [SHORT], CONTEÚDO, VÍDEO, números ou ano — só o assunto), descricao (1 frase curta)}]} — um item por linha recebida, na mesma ordem.' },
+        { role: 'user', content: lista.slice(0, 8000) },
       ] }),
     })
-    if (!r.ok) return { nome: null, descricao: null }
-    const d = await r.json(); const c = JSON.parse(d.choices[0].message.content)
-    return { nome: (c.nome && String(c.nome).trim()) || null, descricao: (c.descricao && String(c.descricao).trim()) || null }
-  } catch { return { nome: null, descricao: null } }
+    if (!r.ok) return vazio
+    const d = await r.json()
+    const parsed = JSON.parse(d.choices[0].message.content)
+    const porI = {}
+    for (const it of (parsed.itens || [])) porI[it.i] = { nome: (it.nome && String(it.nome).trim()) || null, descricao: (it.descricao && String(it.descricao).trim()) || null }
+    return arquivos.map((_, i) => porI[i] || { nome: null, descricao: null })
+  } catch { return vazio }
 }
 
 // --- Supabase (service key) ---
 async function sbGet(env, q) { const r = await fetch(`${SUPA}/rest/v1/${q}`, { headers: { apikey: env.SUPA_SECRET, Authorization: 'Bearer ' + env.SUPA_SECRET } }); try { return await r.json() } catch { return [] } }
-async function sbUpsert(env, row) { const r = await fetch(`${SUPA}/rest/v1/editados`, { method: 'POST', headers: { apikey: env.SUPA_SECRET, Authorization: 'Bearer ' + env.SUPA_SECRET, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([row]) }); if (!r.ok) throw new Error('upsert ' + r.status) }
+async function sbUpsertMany(env, rows) { if (!rows.length) return; const r = await fetch(`${SUPA}/rest/v1/editados`, { method: 'POST', headers: { apikey: env.SUPA_SECRET, Authorization: 'Bearer ' + env.SUPA_SECRET, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }); if (!r.ok) throw new Error('upsert ' + r.status) }
 
 async function sincronizar(env) {
   const token = await googleToken(env)
@@ -82,13 +87,23 @@ async function sincronizar(env) {
   for (const a of alvos) { for (const v of await vidsDe(token, a.id)) todos.push({ ...v, secao: a.secao }) }
   const jaTem = await sbGet(env, 'editados?select=drive_id&nome_ia=not.is.null')
   const comNome = new Set((Array.isArray(jaTem) ? jaTem : []).map((e) => e.drive_id))
-  let novos = 0
-  for (const v of todos) {
-    const row = { drive_id: v.id, nome_arquivo: v.name, secao: v.secao, thumb: v.hasThumbnail ? v.thumbnailLink : null, criado: v.createdTime || null, atualizado_em: new Date().toISOString() }
-    if (!comNome.has(v.id)) { const ia = await nomeIA(env, v.name); row.nome_ia = ia.nome; row.descricao = ia.descricao; novos++ }
-    await sbUpsert(env, row)
+  const novos = todos.filter((v) => !comNome.has(v.id))
+  // nomeia os NOVOS em lote (poucas chamadas), pra caber no limite de subrequests da Cloudflare
+  const nomes = new Map()
+  for (let i = 0; i < novos.length; i += 18) {
+    const chunk = novos.slice(i, i + 18)
+    const res = await nomeIALote(env, chunk.map((v) => v.name))
+    chunk.forEach((v, j) => nomes.set(v.id, res[j]))
   }
-  return { novos, total: todos.length }
+  const now = new Date().toISOString()
+  const rows = todos.map((v) => {
+    const row = { drive_id: v.id, nome_arquivo: v.name, secao: v.secao, thumb: v.hasThumbnail ? v.thumbnailLink : null, criado: v.createdTime || null, atualizado_em: now }
+    const n = nomes.get(v.id)
+    if (n) { row.nome_ia = n.nome; row.descricao = n.descricao }
+    return row
+  })
+  await sbUpsertMany(env, rows) // 1 upsert em vez de 1 por vídeo
+  return { novos: novos.length, total: todos.length }
 }
 
 export default {
