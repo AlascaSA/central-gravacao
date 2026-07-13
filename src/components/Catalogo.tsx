@@ -475,9 +475,9 @@ export default function Catalogo() {
       )}
 
       {aberto && createPortal((
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
           <div className="fade-in absolute inset-0 bg-black/70" onClick={() => setIdx(null)} />
-          <div className="sheet-up relative w-full max-w-2xl h-[86vh] flex flex-col bg-elev border border-border-strong rounded-2xl p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
+          <div className="sheet-up relative w-full max-w-2xl h-[92vh] sm:h-[86vh] flex flex-col bg-elev border border-border-strong rounded-2xl p-3 sm:p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex items-center gap-2 mb-3 shrink-0">
               <div className="flex items-center gap-1 shrink-0">
                 <button disabled={!temPrev} onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className={navBtn}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
@@ -539,10 +539,10 @@ export default function Catalogo() {
                 />
               )}
               {temPrev && (
-                <button onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
+                <button onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 w-10 hidden sm:grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
               )}
               {temNext && (
-                <button onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
+                <button onClick={() => setIdx((i) => (i == null ? i : i + 1))} aria-label="Próximo vídeo" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 w-10 hidden sm:grid place-items-center rounded-full bg-black/45 hover:bg-black/70 text-white backdrop-blur-sm transition-colors text-[20px] leading-none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></button>
               )}
             </div>
             {(() => {
