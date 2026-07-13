@@ -96,15 +96,23 @@ async function sincronizar(env) {
     chunk.forEach((v, j) => nomes.set(v.id, res[j]))
   }
   const now = new Date().toISOString()
-  const porId = new Map() // dedup por drive_id (evita "affect row twice" no upsert)
+  const vistos = new Set(), novosRows = [], existRows = []
   for (const v of todos) {
-    const row = { drive_id: v.id, nome_arquivo: v.name, secao: v.secao, thumb: v.hasThumbnail ? v.thumbnailLink : null, criado: v.createdTime || null, atualizado_em: now }
-    const n = nomes.get(v.id)
-    if (n) { row.nome_ia = n.nome; row.descricao = n.descricao }
-    porId.set(v.id, row)
+    if (vistos.has(v.id)) continue // dedup por drive_id
+    vistos.add(v.id)
+    const thumb = v.hasThumbnail ? v.thumbnailLink : null
+    if (comNome.has(v.id)) {
+      // já nomeado: só refresca thumb/criado (SEM nome_ia/descricao, pra preservar)
+      existRows.push({ drive_id: v.id, nome_arquivo: v.name, secao: v.secao, thumb, criado: v.createdTime || null, atualizado_em: now })
+    } else {
+      const n = nomes.get(v.id) || { nome: null, descricao: null }
+      novosRows.push({ drive_id: v.id, nome_arquivo: v.name, secao: v.secao, thumb, criado: v.createdTime || null, atualizado_em: now, nome_ia: n.nome, descricao: n.descricao })
+    }
   }
-  await sbUpsertMany(env, [...porId.values()]) // 1 upsert só
-  return { novos: novos.length, total: todos.length }
+  // dois upserts com chaves uniformes cada (PostgREST exige mesmas chaves no lote)
+  await sbUpsertMany(env, novosRows)
+  await sbUpsertMany(env, existRows)
+  return { novos: novosRows.length, total: todos.length }
 }
 
 export default {
