@@ -14,9 +14,13 @@ export async function onRequest({ request, env }) {
 
   const SUPA = SUPA_URL(env)
   const KEY = env.VITE_SUPABASE_ANON_KEY
-  const chk = await fetch(`${SUPA}/rest/v1/brutos?select=drive_id&drive_id=eq.${encodeURIComponent(id)}&limit=1`, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
-  const rows = await chk.json().catch(() => [])
-  if (!Array.isArray(rows) || !rows.length) return new Response('não encontrado', { status: 404 })
+  // só assina id que é bruto OU editado cadastrado (evita virar acesso aberto ao Shared Drive todo)
+  const emTabela = async (t) => {
+    const r = await fetch(`${SUPA}/rest/v1/${t}?select=drive_id&drive_id=eq.${encodeURIComponent(id)}&limit=1`, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
+    const rows = await r.json().catch(() => [])
+    return Array.isArray(rows) && rows.length > 0
+  }
+  if (!(await emTabela('brutos')) && !(await emTabela('editados'))) return new Response('não encontrado', { status: 404 })
 
   const exp = Math.floor(Date.now() / 1000) + 3600 // 1h
   const sig = await hmacSha256(secret, id + ':' + exp)

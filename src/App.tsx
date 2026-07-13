@@ -7,6 +7,7 @@ import Board from './components/Board'
 import Archive from './components/Archive'
 import Catalogo from './components/Catalogo'
 import Links from './components/Links'
+import Editados from './components/Editados'
 import NewCardModal from './components/NewCardModal'
 import UploadModal from './components/UploadModal'
 import CardDetail from './components/CardDetail'
@@ -231,7 +232,7 @@ export default function App() {
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {vista === 'catalogo' ? <Catalogo /> : vista === 'links' ? <Links /> : <Archive cards={arquivados} />}
+          {vista === 'catalogo' ? <Catalogo /> : vista === 'links' ? <Links /> : vista === 'postar' ? <Editados modo="postar" /> : vista === 'postados' ? <Editados modo="postados" /> : <Archive cards={arquivados} />}
         </div>
       )}
 
