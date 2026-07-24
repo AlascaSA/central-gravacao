@@ -11,6 +11,7 @@ import { listarVideos } from './lib/scan.mjs'
 const SUPA = 'https://kkvuioyferqbilfwdkqa.supabase.co'
 const SECRET = process.env.SUPA_SECRET
 const BUCKET = 'proxies'
+const TEAM = process.env.TEAM || 'jaylton' // time/professor do lote; grava na coluna team dos brutos novos
 const KEY_PATH = '/Users/gcosta/Downloads/baixa-gravacoes-04ae892ee0e9.json'
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'capas-'))
 if (!SECRET) { console.error('faltou SUPA_SECRET no env'); process.exit(1) }
@@ -66,7 +67,7 @@ async function upsert(v, capa) {
   const body = {
     drive_id: v.id, nome: v.name, mes: v.mes, dia: v.dia,
     mb: v.size ? Math.round(v.size / 1048576) : null, duracao: v.seg,
-    criado: v.createdTime, pasta_id: v.pastaId,
+    criado: v.createdTime, pasta_id: v.pastaId, team: TEAM,
   }
   if (capa) body.capa_url = capa
   const r = await sb('brutos', {
@@ -106,12 +107,14 @@ for (const v of videos) {
 // e NÃO estão ligados a um card (esses ficam pra não quebrar o vínculo).
 if (!raizes) {
   try {
-    const emBanco = await (await sb('brutos?select=drive_id,card_id')).json()
+    // ESCOPADO POR TIME: só lê e só apaga brutos do TEAM atual. Sem isso, uma varredura do jaylton
+    // (raízes fixas do jaylton) apagaria brutos de outros times, que nunca entram no `scanned`.
+    const emBanco = await (await sb(`brutos?select=drive_id,card_id&team=eq.${encodeURIComponent(TEAM)}`)).json()
     const scanned = new Set(videos.map((v) => v.id))
     const removidos = (Array.isArray(emBanco) ? emBanco : []).filter((b) => !scanned.has(b.drive_id) && !b.card_id).map((b) => b.drive_id)
     if (removidos.length) {
       const lista = removidos.map((id) => `"${id}"`).join(',')
-      const r = await sb(`brutos?drive_id=in.(${lista})`, { method: 'DELETE' })
+      const r = await sb(`brutos?team=eq.${encodeURIComponent(TEAM)}&drive_id=in.(${lista})`, { method: 'DELETE' })
       console.log(`removidos do catálogo: ${removidos.length} (${r.ok ? 'ok' : 'falhou ' + r.status})`)
     }
   } catch (e) { console.log('prune erro: ' + e.message) }

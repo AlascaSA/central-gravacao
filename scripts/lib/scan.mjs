@@ -7,6 +7,8 @@ export const BRUTOS_ROOTS = [
 ]
 export const IGNORAR_PASTAS = /editando|editado|__proxies__/i
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+// abreviações de 3 letras (pasta "JUL", "JAN"…). Só usadas se o nome por extenso não bater.
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
 const FIELDS =
   'nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,hasThumbnail,thumbnailLink,videoMediaMetadata(durationMillis))'
@@ -53,7 +55,8 @@ export async function listarVideos(token, raizes = BRUTOS_ROOTS) {
           const nome = (f.name || '').trim()
           let mes = ctx.mes
           let dia = ctx.dia
-          const iMes = MESES.findIndex((m) => new RegExp('^' + m + '\\b', 'i').test(nome))
+          let iMes = MESES.findIndex((m) => new RegExp('^' + m + '\\b', 'i').test(nome))
+          if (iMes < 0) iMes = MESES_ABREV.findIndex((a) => new RegExp('^' + a + '\\b', 'i').test(nome)) // "JUL" → Julho
           if (iMes >= 0) mes = MESES[iMes]
           else if (/^\d{1,2}$/.test(nome) || /^dia\s*\d/i.test(nome)) dia = nome.replace(/^dia\s*/i, '').padStart(2, '0')
           proximo.push({ id: f.id, mes, dia })

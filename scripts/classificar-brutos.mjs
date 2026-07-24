@@ -15,6 +15,7 @@ const KEY_PATH = '/Users/gcosta/Downloads/baixa-gravacoes-04ae892ee0e9.json'
 const FORCE = process.argv.includes('--force')
 const SO_TRANSC = process.argv.includes('--so-transcrever') // só transcreve; classificação vai via Claude
 const RECLASS = process.argv.includes('--reclassificar') // mantém transcrição, re-classifica tudo
+const TEAM = process.env.TEAM || 'jaylton' // time/professor do lote — escopa leitura e grava na coluna team
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'classif-'))
 if (!GROQ || !SECRET) { console.error('faltou GROQ_KEY ou SUPA_SECRET'); process.exit(1) }
 
@@ -48,7 +49,7 @@ function numDoNome(nome) {
 // brutos que já têm proxy no Drive, EM ORDEM DE GRAVAÇÃO (número do clipe, não a data do upload) —
 // a classificação vê o vizinho anterior/próximo pra pegar regravação, então a ordem tem que ser a sequência real.
 async function listarBrutos() {
-  const rows = await jsonOf(await sb('brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado&proxy_id=not.is.null'))
+  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado&proxy_id=not.is.null&team=eq.${TEAM}`))
   const arr = (Array.isArray(rows) ? rows : []).map((b) => ({
     id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id,
     num: numDoNome(b.nome_original || b.nome), criado: b.criado || '',
@@ -97,9 +98,15 @@ const REGRAS = 'Categorias: "boa" (tomada limpa e usável de conteúdo), "erro" 
   'REGRA-CHAVE: compare o ATUAL com o PRÓXIMO — se o próximo refaz a MESMA fala, o ATUAL foi o erro (descarte) e o próximo é o bom; se o próximo traz conteúdo NOVO continuando o assunto, o ATUAL pode ser boa/gancho e o próximo é complemento. ' +
   'Transcrição vazia = clipe silencioso = "erro". Duração 4-6s costuma ser gancho ou erro; 30s+ tomada cheia.'
 
+// Apelido = o gancho/ideia central do clipe pra nomear o arquivo (o Renomeador anexa CAMPANHA-OBJETIVO-... depois).
+// O bruto batizado vira "BR-<apelido>"; estas regras deixam o apelido no padrão desde a sugestão da IA.
+const APELIDO = 'O "titulo" é o APELIDO do clipe: o gancho/ideia central em 2 a 4 palavras (máx 5), concreto e específico — NÃO um resumo. ' +
+  'Minúsculas, só letras e espaços (acentos ok); sem pontuação, números, símbolos, nome de produto/campanha nem as palavras "vídeo"/"anúncio"/"reel". ' +
+  'Se for depoimento/entrevista, use o nome da pessoa (ex.: "depoimento julia"). Exemplos: "professora cansada", "herdeiro menor", "migrar de área".'
+
 async function classificar(atual, dur, prev, next, exemplos) {
   const fewshot = exemplos.length ? '\n\nExemplos confirmados por humano (aprenda):\n' + exemplos.map((e) => `dur ${e.duracao ?? '?'}s "${(e.transcricao || '(silêncio)').slice(0, 80)}" => ${e.tipo}`).join('\n') : ''
-  const sys = `Você classifica brutos de vídeo de um criador jurídico (Direito Empresarial), na ordem de gravação. ${REGRAS} Responda SÓ JSON: {tipo, tema, tags (array curto), resumo (1 frase), confianca (0-1), motivo (curto), titulo (título curto de 3 a 6 palavras que resuma o assunto pra nomear o arquivo)}.`
+  const sys = `Você classifica brutos de vídeo de um criador jurídico (Direito Empresarial), na ordem de gravação. ${REGRAS} Responda SÓ JSON: {tipo, tema, tags (array curto), resumo (1 frase), confianca (0-1), motivo (curto), titulo}. ${APELIDO}`
   const user = `Clipe ANTERIOR: ${prev ? `"${prev.slice(0, 220)}"` : '(nenhum)'}\n` +
     `Clipe PRÓXIMO: ${next ? `"${next.slice(0, 220)}"` : '(nenhum)'}\n` +
     `Clipe ATUAL — duração ${dur ?? '?'}s, transcrição: ${atual ? `"${atual}"` : '(silêncio / sem fala)'}${fewshot}`
@@ -125,14 +132,14 @@ async function classificar(atual, dur, prev, next, exemplos) {
   }
 }
 
-// título curto (3-6 palavras) só pra nomear — usado no backfill de sugestao_titulo dos "boa"
+// apelido curto só pra nomear — usado no backfill de sugestao_titulo dos "boa"
 async function tituloCurto(transc) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST', headers: { Authorization: 'Bearer ' + GROQ, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile', temperature: 0.2, response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: 'Gere um título curto (3 a 6 palavras) que resuma o assunto do vídeo, pra nomear o arquivo. Responda só JSON {"titulo":"..."}.' },
+        { role: 'system', content: `Gere o apelido do vídeo pra nomear o arquivo. Responda só JSON {"titulo":"..."}. ${APELIDO}` },
         { role: 'user', content: String(transc || '').slice(0, 4000) },
       ],
     }),
@@ -149,9 +156,9 @@ async function upsert(row) {
 
 // ---- run ----
 const fila = await listarBrutos() // já vem só quem tem proxy, em ordem de gravação
-const existentes = await jsonOf(await sb('brutos?select=drive_id,transcricao,ia_tipo'))
+const existentes = await jsonOf(await sb(`brutos?select=drive_id,transcricao,ia_tipo&team=eq.${TEAM}`))
 const exMap = new Map((Array.isArray(existentes) ? existentes : []).map((e) => [e.drive_id, e]))
-const exemplos = await jsonOf(await sb('brutos_exemplos?select=transcricao,duracao,tipo&order=criado_em.desc&limit=12'))
+const exemplos = await jsonOf(await sb(`brutos_exemplos?select=transcricao,duracao,tipo&team=eq.${TEAM}&order=criado_em.desc&limit=12`))
 const fewshot = Array.isArray(exemplos) ? exemplos : []
 
 console.log(`${fila.length} brutos com proxy na fila, ${exMap.size} já no banco`)
@@ -168,7 +175,7 @@ for (const b of fila) {
       process.stdout.write(`• ${b.nome} transcrevendo… `)
       await baixarProxy(b.proxyId, tmp)
       transc = await transcrever(tmp)
-      await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, atualizado_em: new Date().toISOString() })
+      await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, team: TEAM, atualizado_em: new Date().toISOString() })
       console.log(transc ? `"${transc.slice(0, 50)}${transc.length > 50 ? '…' : ''}"` : '(silêncio)')
     } catch (e) { console.log('ERRO transc: ' + e.message); transc = '' } finally { fs.rmSync(tmp, { force: true }) }
   }
@@ -188,7 +195,7 @@ for (let i = 0; i < itens.length; i++) {
     const c = await classificar(transc, b.seg, prev, next, fewshot)
     const tipos = ['boa', 'erro', 'gancho', 'complemento']
     await upsert({
-      drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc,
+      drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, team: TEAM,
       ia_tipo: tipos.includes(c.tipo) ? c.tipo : 'erro', ia_tema: c.tema || null,
       ia_tags: Array.isArray(c.tags) ? c.tags : null, ia_resumo: c.resumo || null,
       ia_confianca: typeof c.confianca === 'number' ? c.confianca : null, ia_motivo: c.motivo || null,
@@ -202,14 +209,14 @@ for (let i = 0; i < itens.length; i++) {
 // backfill: "boa" (proposto ou confirmado) com transcrição mas sem sugestao_titulo
 // (classificados antes do campo existir) — 1 chamada Groq "só título", sem re-classificar
 if (!SO_TRANSC) {
-  const semTit = await jsonOf(await sb('brutos?select=drive_id,nome,transcricao&or=(ia_tipo.eq.boa,tipo.eq.boa)&sugestao_titulo.is.null'))
+  const semTit = await jsonOf(await sb(`brutos?select=drive_id,nome,transcricao&or=(ia_tipo.eq.boa,tipo.eq.boa)&sugestao_titulo.is.null&team=eq.${TEAM}`))
   const alvoTit = (Array.isArray(semTit) ? semTit : []).filter((x) => x.transcricao && x.transcricao.trim())
   if (alvoTit.length) {
     console.log(`--- backfill de título em ${alvoTit.length} "boa" ---`)
     for (const x of alvoTit) {
       try {
         const t = await tituloCurto(x.transcricao)
-        if (t) { await upsert({ drive_id: x.drive_id, sugestao_titulo: t }); console.log(`  ${x.nome} → ${t}`) }
+        if (t) { await upsert({ drive_id: x.drive_id, team: TEAM, sugestao_titulo: t }); console.log(`  ${x.nome} → ${t}`) }
       } catch (e) { console.log(`  ${x.nome} erro: ${e.message}`) }
     }
   }

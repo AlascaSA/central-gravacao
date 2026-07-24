@@ -7,6 +7,10 @@ on:
       pasta:
         description: "id ou link de uma pasta pra escanear só ela (vazio = varre tudo)"
         required: false
+      team:
+        description: "id do time/professor do lote (grava na coluna team dos brutos)"
+        required: false
+        default: "jaylton"
       reclassificar:
         description: "true = re-classifica TODOS na ordem certa do número (mantém a transcrição)"
         required: false
@@ -34,12 +38,14 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
+          TEAM: ${{ inputs.team || 'jaylton' }}
 
       - name: Gerar proxies leves (720p) dos que ainda não têm
         run: node scripts/gerar-proxies.mjs
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
+          TEAM: ${{ inputs.team || 'jaylton' }}
 
       - name: Classificar com IA (transcrição + tipo)
         run: node scripts/classificar-brutos.mjs ${{ inputs.reclassificar == 'true' && '--reclassificar' || '' }}
@@ -47,3 +53,4 @@ jobs:
           GROQ_KEY: ${{ secrets.GROQ_KEY }}
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
+          TEAM: ${{ inputs.team || 'jaylton' }}
