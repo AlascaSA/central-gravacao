@@ -5,7 +5,9 @@ export const BRUTOS_ROOTS = [
   '1teUk4IYAMH3Fd99LvS1NvTyY2FPbeMq-', // "Brutos" (Reel geral, YouTube, Teste, STORYTELLING…)
   '1Fkdt2hYQQ6K8DJyvDy1tliCpYDhS1Qil', // "Brutos" antiga (vídeos soltos)
 ]
-export const IGNORAR_PASTAS = /editando|editado|__proxies__/i
+// "Downloads temporários" guarda CÓPIAS feitas pelo botão de baixar em lote — se a varredura entrasse
+// nela, os mesmos vídeos voltariam ao catálogo como brutos novos, duplicados.
+export const IGNORAR_PASTAS = /editando|editado|__proxies__|downloads tempor/i
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 // abreviações de 3 letras (pasta "JUL", "JAN"…). Só usadas se o nome por extenso não bater.
 const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
