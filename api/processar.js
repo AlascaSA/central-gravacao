@@ -1,5 +1,5 @@
 // Modelo do Groq (pode trocar se algum sair do ar)
-const GROQ_MODEL = 'llama-3.3-70b-versatile'
+const GROQ_MODEL = 'openai/gpt-oss-120b'
 
 // Libs de extração são importadas SOB DEMANDA (evita crash no cold-start da serverless).
 async function extrairTexto(buf, nome) {
@@ -43,22 +43,33 @@ async function chamarGroq(texto, copy) {
     '- Se o documento for de um unico video, retorne UM item.\n' +
     '- Nao invente videos que nao estao no texto. Nada fora do JSON.'
 
-  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.2,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: String(texto).slice(0, 28000) },
-      ],
-    }),
-  })
+  const pedir = (limite) =>
+    fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: String(texto).slice(0, limite) },
+        ],
+      }),
+    })
+
+  let resp = await pedir(28000)
+  if (resp.status === 429) {
+    // O gpt-oss-120b tem teto de 8 mil tokens/min no plano gratis (o llama antigo dava
+    // 12 mil), entao documento grande passa raspando. Em vez de perder o upload inteiro,
+    // espera o pouco que a Groq pedir e refaz a leitura com metade do texto.
+    const espera = Math.min(Number(resp.headers.get('retry-after') || 2), 3)
+    await new Promise((r) => setTimeout(r, espera * 1000))
+    resp = await pedir(14000)
+  }
 
   if (!resp.ok) {
     const t = await resp.text()

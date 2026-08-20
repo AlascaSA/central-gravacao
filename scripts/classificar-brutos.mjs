@@ -110,7 +110,7 @@ async function classificar(atual, dur, prev, next, exemplos) {
   const user = `Clipe ANTERIOR: ${prev ? `"${prev.slice(0, 220)}"` : '(nenhum)'}\n` +
     `Clipe PRÓXIMO: ${next ? `"${next.slice(0, 220)}"` : '(nenhum)'}\n` +
     `Clipe ATUAL — duração ${dur ?? '?'}s, transcrição: ${atual ? `"${atual}"` : '(silêncio / sem fala)'}${fewshot}`
-  const payload = JSON.stringify({ model: 'llama-3.3-70b-versatile', temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] })
+  const payload = JSON.stringify({ model: 'openai/gpt-oss-120b', temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] })
   for (let tent = 0; ; tent++) {
     let r
     try {
@@ -137,7 +137,7 @@ async function tituloCurto(transc) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST', headers: { Authorization: 'Bearer ' + GROQ, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile', temperature: 0.2, response_format: { type: 'json_object' },
+      model: 'openai/gpt-oss-120b', temperature: 0.2, response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: `Gere o apelido do vídeo pra nomear o arquivo. Responda só JSON {"titulo":"..."}. ${APELIDO}` },
         { role: 'user', content: String(transc || '').slice(0, 4000) },

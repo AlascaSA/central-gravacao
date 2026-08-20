@@ -23,7 +23,7 @@ Processamento pesado (sob demanda, botão "Processar novos")
 - **Frontend:** React + TypeScript + Vite + Tailwind + dnd-kit.
 - **Funções `/api`:** Cloudflare Pages Functions (motor de Workers). Assinaturas HMAC e JWT do Google via Web Crypto; leitura/escrita no Supabase; disparo do GitHub Actions.
 - **Banco:** Supabase — tabela `cards` (o quadro) e `brutos` (o catálogo + classificação).
-- **IA:** Groq (Whisper `whisper-large-v3-turbo` pra transcrever, `llama-3.3-70b` pra classificar/nomear).
+- **IA:** Groq (Whisper `whisper-large-v3-turbo` pra transcrever, `openai/gpt-oss-120b` pra classificar/nomear).
 - **Conta de serviço Google** (`brutos-reader@baixa-gravacoes`) com acesso ao Shared Drive dos brutos (ler + renomear + subir proxies).
 
 ---
@@ -73,7 +73,7 @@ Vídeos 4K crus travam e o player do Drive às vezes mostra "ainda processando".
 Roda no pipeline, em cima da transcrição de cada bruto.
 
 - **Transcrição:** Groq Whisper (só o áudio, 16kHz mono).
-- **Classificação:** `llama-3.3-70b` vendo o clipe **anterior e o próximo** (na ordem do número) pra pegar **regravação** — se o próximo refaz a mesma fala, o atual = erro. Tipos: **boa / erro / gancho / complemento**. É proposta; o humano confirma/corrige no player (e a correção vira exemplo few-shot).
+- **Classificação:** `openai/gpt-oss-120b` vendo o clipe **anterior e o próximo** (na ordem do número) pra pegar **regravação** — se o próximo refaz a mesma fala, o atual = erro. Tipos: **boa / erro / gancho / complemento**. É proposta; o humano confirma/corrige no player (e a correção vira exemplo few-shot).
 - **Título automático:** a IA gera um título curto de cada bruto (`sugestao_titulo`).
 - **Proposta de card SR:** todo bruto **"boa" sem card** vira uma **sugestão de card "sem roteiro"** no Catálogo — com o título **editável** e botões **Aprovar/Rejeitar**. Aprovar cria o card em "A editar", liga o bruto e o batiza. O card leva o título limpo (já tem o selo "sem roteiro").
 
