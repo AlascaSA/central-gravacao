@@ -1,5 +1,3 @@
-import { SUPA_URL } from './_util.js'
-
 // Recebe o TEXTO de um roteiro e casa cada peça dele com as tomadas já gravadas, comparando com a
 // transcrição de cada bruto. Devolve propostas (peça → tomadas) pra virarem tarefas na fila de
 // revisão. Não grava nada aqui: quem cria é o app, e nada entra no fluxo sem alguém aprovar.
@@ -8,22 +6,23 @@ const MAX_BRUTOS = 60
 // O gpt-oss-120b tem teto de 8 mil tokens/min: 60 tomadas com 380 caracteres cada mais o
 // roteiro inteiro passavam de 9 mil e tomavam 429. Com 240 caracteres por tomada o pedido
 // fica em ~6,5 mil e a fala continua identificável — corta o excesso, não a cobertura.
+const SUPA = process.env.VITE_SUPABASE_URL || 'https://kkvuioyferqbilfwdkqa.supabase.co'
+const KEY = process.env.VITE_SUPABASE_ANON_KEY
 
-export async function onRequest({ request, env }) {
+export default async (req) => {
   try {
-    if (request.method !== 'POST') return Response.json({ error: 'método inválido' }, { status: 405 })
-    const { texto, team, dia, mes } = await request.json().catch(() => ({}))
+    if (req.method !== 'POST') return Response.json({ error: 'método inválido' }, { status: 405 })
+    const { texto, team, dia, mes } = await req.json().catch(() => ({}))
     if (!texto || String(texto).trim().length < 40) return Response.json({ error: 'cole o texto do roteiro' }, { status: 400 })
-    if (!env.GROQ_API_KEY) return Response.json({ error: 'GROQ_API_KEY ausente' }, { status: 500 })
+    if (!process.env.GROQ_API_KEY) return Response.json({ error: 'GROQ_API_KEY ausente' }, { status: 500 })
 
-    const S = SUPA_URL(env), KEY = env.VITE_SUPABASE_ANON_KEY
     const hdr = { apikey: KEY, Authorization: 'Bearer ' + KEY }
 
     // só tomadas SEM tarefa e COM transcrição — o resto não tem como casar nem precisa
     let q = `brutos?select=drive_id,nome,duracao,transcricao,tipo,ia_tipo&team=eq.${encodeURIComponent(team || 'jaylton')}&card_id=is.null&transcricao=not.is.null&order=criado.asc`
     if (dia) q += `&dia=eq.${encodeURIComponent(dia)}`
     if (mes) q += `&mes=eq.${encodeURIComponent(mes)}`
-    const brutos = await (await fetch(`${S}/rest/v1/${q}`, { headers: hdr })).json()
+    const brutos = await (await fetch(`${SUPA}/rest/v1/${q}`, { headers: hdr })).json()
     if (!Array.isArray(brutos) || !brutos.length) return Response.json({ error: 'nenhuma tomada solta com transcrição nesse período' }, { status: 404 })
 
     const lista = brutos.slice(0, MAX_BRUTOS)
@@ -56,7 +55,7 @@ Se nada casar com segurança, devolva {"pecas":[]}.`
 
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.GROQ_API_KEY },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.GROQ_API_KEY },
       body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }),
     })
     const d = await r.json()
