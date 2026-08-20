@@ -1,1 +1,7 @@
-/* /index.html 200
+# /api/* precisa vir ANTES do catch-all: as regras deste arquivo são lidas antes das do
+# netlify.toml, e sem esta linha o /* abaixo engole /api/... (em GET devolve o index e em
+# POST devolve 404, que foi o que quebrou o "Subir roteiros").
+/api/*  /.netlify/functions/:splat  200
+
+# SPA: qualquer outra rota cai no index (roteamento no cliente)
+/*  /index.html  200
