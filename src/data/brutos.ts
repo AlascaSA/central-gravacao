@@ -10,6 +10,8 @@ export interface Bruto {
   /** Mês/dia da PASTA real no Drive (ex: "Junho 2026" / "26"). Quando vazio, usa a data. */
   mes?: string | null
   dia?: string | null
+  /** Subpasta de assunto dentro do dia ("parte 2", "ganchos"). Separa o material no Catálogo. */
+  bloco?: string | null
   /** true quando já existe uma versão leve (720p) pronta pra tocar direto no player. */
   temProxy?: boolean
 }

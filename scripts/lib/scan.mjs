@@ -43,7 +43,7 @@ async function filhos(token, fid) {
 export async function listarVideos(token, raizes = BRUTOS_ROOTS) {
   const videos = new Map() // id -> obj (dedupe)
   const visitadas = new Set()
-  let nivel = raizes.map((id) => ({ id, mes: null, dia: null }))
+  let nivel = raizes.map((id) => ({ id, mes: null, dia: null, bloco: null }))
   while (nivel.length) {
     const listas = await Promise.all(
       nivel.map((n) => filhos(token, n.id).then((fs) => ({ ctx: n, fs })).catch(() => ({ ctx: n, fs: [] }))),
@@ -57,11 +57,15 @@ export async function listarVideos(token, raizes = BRUTOS_ROOTS) {
           const nome = (f.name || '').trim()
           let mes = ctx.mes
           let dia = ctx.dia
+          // BLOCO: pasta de assunto que a pessoa cria DENTRO do dia ("parte 2", "ganchos", "corpo").
+          // Não é mês nem dia — serve pra separar o material no Catálogo sem bagunçar a data.
+          let bloco = ctx.bloco
           let iMes = MESES.findIndex((m) => new RegExp('^' + m + '\\b', 'i').test(nome))
           if (iMes < 0) iMes = MESES_ABREV.findIndex((a) => new RegExp('^' + a + '\\b', 'i').test(nome)) // "JUL" → Julho
           if (iMes >= 0) mes = MESES[iMes]
           else if (/^\d{1,2}$/.test(nome) || /^dia\s*\d/i.test(nome)) dia = nome.replace(/^dia\s*/i, '').padStart(2, '0')
-          proximo.push({ id: f.id, mes, dia })
+          else if (dia && !bloco) bloco = nome // só o primeiro nível abaixo do dia vira bloco
+          proximo.push({ id: f.id, mes, dia, bloco })
         } else if ((f.mimeType || '').includes('video')) {
           const criado = f.createdTime || f.modifiedTime || null
           const ano = criado ? new Date(criado).getFullYear() : new Date().getFullYear()
@@ -75,6 +79,7 @@ export async function listarVideos(token, raizes = BRUTOS_ROOTS) {
               : null,
             mes: ctx.mes ? `${ctx.mes} ${ano}` : null,
             dia: ctx.dia || null,
+            bloco: ctx.bloco || null,
             pastaId: ctx.id,
           })
         }

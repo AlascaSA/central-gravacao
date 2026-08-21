@@ -6,7 +6,7 @@ export async function onRequest({ request, env }) {
     const SUPA = SUPA_URL(env)
     const KEY = env.VITE_SUPABASE_ANON_KEY
     const team = new URL(request.url).searchParams.get('team') || 'jaylton'
-    const url = `${SUPA}/rest/v1/brutos?select=drive_id,nome,mes,dia,capa_url,mb,duracao,criado,proxy_id&team=eq.${encodeURIComponent(team)}&order=criado.desc.nullslast`
+    const url = `${SUPA}/rest/v1/brutos?select=drive_id,nome,mes,dia,bloco,capa_url,mb,duracao,criado,proxy_id&team=eq.${encodeURIComponent(team)}&order=criado.desc.nullslast`
     const r = await fetch(url, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
     const rows = await r.json()
     if (!Array.isArray(rows)) return Response.json({ error: (rows && rows.message) || 'erro' }, { status: 500 })
@@ -19,6 +19,7 @@ export async function onRequest({ request, env }) {
       criado: b.criado ?? null,
       mes: b.mes ?? null,
       dia: b.dia ?? null,
+      bloco: b.bloco ?? null,
       temProxy: !!b.proxy_id,
     }))
     return Response.json({ videos })

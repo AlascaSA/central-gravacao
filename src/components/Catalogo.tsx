@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
-import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
+import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, unirBrutos, irmaosDoGrupo, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
 import { getTeam, listarTimes } from '../data/team'
 import { store } from '../data/store'
 import ProdutoPicker from './ProdutoPicker'
@@ -232,26 +232,88 @@ export default function Catalogo() {
       .catch(() => {})
   }, [])
 
+  // une as tomadas selecionadas num grupo (ver data/catalogoBrutos.ts)
+  const [unindo, setUnindo] = useState(false)
+  async function unirSelecionados() {
+    const ids = [...sel]
+    if (ids.length < 2 || unindo) return
+    setUnindo(true)
+    const g = await unirBrutos(ids).catch(() => null)
+    setUnindo(false)
+    if (!g) {
+      setAvisoNome('Não consegui unir. A coluna grupo_id já existe no banco?')
+      setTimeout(() => setAvisoNome(''), 6000)
+      return
+    }
+    setClassif((m) => {
+      const n = { ...m }
+      for (const x of ids) n[x] = { ...(n[x] || { drive_id: x }), grupo_id: g } as Classificacao
+      return n
+    })
+    setSel(new Set())
+
+    // Se ALGUÉM do grupo já estava ligado a um card, os outros vão junto agora — e ganham o nome dele.
+    // Sem isso a união era torta: ligar-depois-unir espalhava, unir-depois-ligar não.
+    const cards_ = [...new Set(ids.map((x) => classif[x]?.card_id).filter(Boolean))] as string[]
+    if (cards_.length > 1) {
+      setAvisoNome('Unidas, mas há tomadas em cards diferentes — desligue uma antes de eu igualar os nomes.')
+      setTimeout(() => setAvisoNome(''), 7000)
+      return
+    }
+    if (cards_.length === 1) {
+      const cardId = cards_[0]
+      setAvisoNome('Unindo ao card e renomeando…')
+      for (const x of ids) if (classif[x]?.card_id !== cardId) await ligarBruto(x, cardId).catch(() => {})
+      setClassif((m) => {
+        const n = { ...m }
+        for (const x of ids) n[x] = { ...(n[x] || { drive_id: x }), card_id: cardId } as Classificacao
+        return n
+      })
+      // rebatiza TODAS (inclusive a que já tinha nome): a numeração das irmãs muda quando o grupo cresce
+      for (const x of ids) {
+        const novo = await batizar(x)
+        if (novo) setBrutos((bs) => (bs ? bs.map((b) => (b.id === x ? { ...b, nome: novo } : b)) : bs))
+      }
+      setAvisoNome(`${ids.length} tomadas unidas e renomeadas pelo card`)
+      setTimeout(() => setAvisoNome(''), 5000)
+      return
+    }
+    setAvisoNome(`${ids.length} tomadas unidas — ligar uma num card leva todas`)
+    setTimeout(() => setAvisoNome(''), 5000)
+  }
+
   async function ligar(cardId: string) {
     if (!aberto) return
     const id = aberto.id, nome = aberto.nome
-    setClassif((m) => ({ ...m, [id]: { ...(m[id] || { drive_id: id }), card_id: cardId } as Classificacao }))
     setLinkOpen(false)
-    await ligarBruto(id, cardId, nome).catch(() => {})
-    const novo = await batizar(id)
-    if (novo) {
-      setBrutos((bs) => (bs ? bs.map((b) => (b.id === id ? { ...b, nome: novo } : b)) : bs))
-      setAvisoNome('Renomeado: ' + novo)
-      setTimeout(() => setAvisoNome(''), 4000)
+    // tomadas unidas vão JUNTAS pro card: ligar uma liga o grupo todo, e o batismo numera as irmãs
+    const ids = await irmaosDoGrupo(id).catch(() => [id])
+    setClassif((m) => {
+      const n = { ...m }
+      for (const x of ids) n[x] = { ...(n[x] || { drive_id: x }), card_id: cardId } as Classificacao
+      return n
+    })
+    for (const x of ids) await ligarBruto(x, cardId, x === id ? nome : undefined).catch(() => {})
+    for (const x of ids) {
+      const novo = await batizar(x)
+      if (novo) setBrutos((bs) => (bs ? bs.map((b) => (b.id === x ? { ...b, nome: novo } : b)) : bs))
     }
+    setAvisoNome(ids.length > 1 ? `${ids.length} tomadas ligadas e renomeadas` : 'Renomeado')
+    setTimeout(() => setAvisoNome(''), 4000)
   }
   async function desligar() {
     if (!aberto) return
-    const id = aberto.id
-    setClassif((m) => ({ ...m, [id]: { ...(m[id] || { drive_id: id }), card_id: null } as Classificacao }))
-    await ligarBruto(id, null).catch(() => {})
-    const novo = await batizar(id)
-    if (novo) setBrutos((bs) => (bs ? bs.map((b) => (b.id === id ? { ...b, nome: novo } : b)) : bs))
+    const ids = await irmaosDoGrupo(aberto.id).catch(() => [aberto.id])
+    setClassif((m) => {
+      const n = { ...m }
+      for (const x of ids) n[x] = { ...(n[x] || { drive_id: x }), card_id: null } as Classificacao
+      return n
+    })
+    for (const x of ids) {
+      await ligarBruto(x, null).catch(() => {})
+      const novo = await batizar(x)
+      if (novo) setBrutos((bs) => (bs ? bs.map((b) => (b.id === x ? { ...b, nome: novo } : b)) : bs))
+    }
   }
   async function definirProduto(produto: string | null) {
     if (!aberto) return
@@ -282,7 +344,7 @@ export default function Catalogo() {
     setLigando(true)
     try {
       const semana = aberto.criado ? semanaDeGravacao(new Date(aberto.criado)) : undefined
-      const card = await store.createCard({ semRoteiro: true, titulo, categoria: 'Conteúdo', fase: 'A editar', semana })
+      const card = await store.createCard({ semRoteiro: true, titulo, categoria: novaCat, fase: 'A editar', semana })
       setCards((cs) => [card, ...cs])
       await ligar(card.id)
     } finally {
@@ -546,7 +608,16 @@ export default function Catalogo() {
           )}
         </div>
         <div className="text-[13px] font-bold truncate">{b.nome}</div>
-        <div className="text-[12px] text-muted tnum mt-0.5">{fmtDur(b.seg)}</div>
+        <div className="text-[12px] text-muted tnum mt-0.5 flex items-center gap-1.5">
+          {fmtDur(b.seg)}
+          {/* tomada unida: sem isso não dá pra saber, olhando a grade, o que anda junto com o quê */}
+          {cl?.grupo_id && (
+            <span title="Unida a outras tomadas — ligar uma num card leva todas" className="inline-flex items-center gap-1 rounded-md bg-brand/12 border border-brand/30 text-brand-2 px-1.5 py-px text-[10.5px] font-bold">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1 1" /><path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1-1" /></svg>
+              unida
+            </span>
+          )}
+        </div>
       </button>
     )
   }
@@ -708,7 +779,32 @@ export default function Catalogo() {
                 </div>
               )}
 
-              {nav.dia && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{videosVisiveis.map(cardEl)}</div>}
+              {/* Dentro do dia, separa pelas subpastas que a pessoa criou no Drive ("parte 2", "ganchos").
+                  Sem subpasta nenhuma, cai na grade única de sempre — nada muda pra quem não usa. */}
+              {nav.dia && (() => {
+                const blocos = new Map<string, typeof videosVisiveis>()
+                for (const v of videosVisiveis) {
+                  const k = v.bloco || ''
+                  if (!blocos.has(k)) blocos.set(k, [])
+                  blocos.get(k)!.push(v)
+                }
+                const chaves = [...blocos.keys()].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b, 'pt-BR')))
+                if (chaves.length <= 1) return <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{videosVisiveis.map(cardEl)}</div>
+                return (
+                  <div className="flex flex-col gap-6">
+                    {chaves.map((k) => (
+                      <div key={k || 'raiz'}>
+                        <div className="flex items-center gap-2 mb-2.5">
+                          <h3 className="text-[12px] font-bold uppercase tracking-[0.06em] text-ink-2">{k || 'sem subpasta'}</h3>
+                          <span className="tnum text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{blocos.get(k)!.length}</span>
+                          <span className="h-px flex-1 bg-border" />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{blocos.get(k)!.map(cardEl)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </>
           )}
         </>
@@ -721,6 +817,18 @@ export default function Catalogo() {
             <span className="text-[13px] font-semibold">{sel.size} selecionado{sel.size > 1 ? 's' : ''}</span>
             <div className="flex-1" />
             <button onClick={() => setSel(new Set())} className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong transition-all">Limpar</button>
+            {/* Unir: as tomadas viram uma peça só. Depois disso, ligar uma num card leva todas. */}
+            {sel.size > 1 && (
+              <button
+                onClick={unirSelecionados}
+                disabled={unindo}
+                title="Tratar como uma peça só: ligar uma num card leva todas"
+                className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong disabled:opacity-60 transition-all inline-flex items-center gap-1.5"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1 1" /><path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1-1" /></svg>
+                {unindo ? 'unindo…' : `Unir ${sel.size}`}
+              </button>
+            )}
             <button
               onClick={baixarOriginais}
               disabled={baixando}
@@ -885,7 +993,14 @@ export default function Catalogo() {
                                 <div className="rounded-lg border border-brand/30 bg-brand/8 p-2.5">
                                   <div className="text-[11px] font-bold uppercase tracking-wide text-brand-2 mb-1.5">IA sugeriu um card — edite se quiser</div>
                                   <input value={tituloEdit} onChange={(e) => setSugTitulo(e.target.value)} className="w-full h-9 px-3 rounded-lg bg-surface border border-border text-[13px] text-ink outline-none focus:border-brand/60 mb-1" />
-                                  <div className="text-[11px] text-muted mb-2">Vídeo no Drive: <span className="text-ink-2 font-medium">SR - {tituloEdit.trim() || '…'}</span></div>
+                                  {/* o arquivo fica com o NOME DO CARD (prefixo BR-, não o SR- antigo) */}
+                                  <div className="text-[11px] text-muted mb-2">Vídeo no Drive: <span className="text-ink-2 font-medium">BR-{tituloEdit.trim() || '…'}</span></div>
+                                  {/* a categoria era 'Conteúdo' fixa no código: anúncio virava conteúdo sem ninguém poder trocar */}
+                                  <div className="flex flex-wrap items-center gap-1 mb-2">
+                                    {CATEGORIAS.map((cat) => (
+                                      <button key={cat} onClick={() => setNovaCat(cat)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCat === cat ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{cat}</button>
+                                    ))}
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     <button disabled={ligando || !tituloEdit.trim()} onClick={() => aprovarSugestao(tituloEdit.trim())} className="text-[12px] font-semibold text-white bg-brand rounded-lg px-3 py-1.5 disabled:opacity-50">Aprovar</button>
                                     <button onClick={() => rejeitarSug(aberto.id)} className="text-[12px] font-medium text-muted hover:text-rose-300 px-2">Rejeitar</button>

@@ -4,14 +4,13 @@ import { googleToken } from './_util.js'
 // preservando o nome original (pra reverter ao desligar) e a extensão. DB via chave anon (RLS de brutos libera).
 const SUPA = (env) => env.VITE_SUPABASE_URL || 'https://kkvuioyferqbilfwdkqa.supabase.co'
 
-// Apelido no padrão Alasca. O bruto batizado carrega "BR-<apelido>"; o Renomeador lê este nome,
-// tira o "BR-" e normaliza. Apelido = minúsculas, só letras e espaços (acentos ok);
-// sem números, pontuação, símbolos ou código (o \p{L} mantém letras acentuadas, tira o resto).
+// O bruto batizado carrega "BR-<nome do card>"; o Renomeador lê este nome e tira o "BR-".
 function apelidoDe(titulo) {
-  // Só normalização de caractere: minúsculas, letras (com acento) e espaço; tira números, pontuação, símbolos.
-  // NÃO remove palavras "proibidas" (vídeo/anúncio/reel) à força — estragaria título legítimo tipo
-  // "Story da Julia". Essa regra fica com a IA (prompt) e com quem digita o título do card.
-  const s = (titulo || '').toLowerCase().replace(/[^\p{L}\s]+/gu, ' ').replace(/\s+/g, ' ').trim()
+  // O ARQUIVO FICA COM O NOME DO CARD, como ele foi escrito — número e maiúscula inclusive.
+  // A versão anterior apagava os números ("Gancho 1", "Gancho 2" e "Gancho 4" viravam todos "gancho"),
+  // e aí o desempate de colisão pendurava um pedaço de id no fim: "BR-gancho 368d". Errado.
+  // Aqui só sai o que o sistema de arquivos não aceita (/ \ : * ? " < > |) e espaço repetido.
+  const s = (titulo || '').replace(/[/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim()
   return s || 'clipe'
 }
 

@@ -65,7 +65,7 @@ async function jaComCapa() {
 // (omitir a coluna no upsert merge-duplicates preserva o valor que já existe).
 async function upsert(v, capa) {
   const body = {
-    drive_id: v.id, nome: v.name, mes: v.mes, dia: v.dia,
+    drive_id: v.id, nome: v.name, mes: v.mes, dia: v.dia, bloco: v.bloco ?? null,
     mb: v.size ? Math.round(v.size / 1048576) : null, duracao: v.seg,
     criado: v.createdTime, pasta_id: v.pastaId, team: TEAM,
   }

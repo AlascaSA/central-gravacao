@@ -14,6 +14,7 @@ export interface Classificacao {
   tipo: TipoBruto | null // confirmado pelo humano
   confirmado: boolean
   card_id: string | null // tarefa ligada
+  grupo_id?: string | null // tomadas unidas: andam juntas pro card
   produto: string | null // triagem por produto (independente de card)
   sugestao_titulo: string | null // título curto que a IA gerou (pra proposta de card SR)
   sugestao_rejeitada: boolean | null // humano dispensou a proposta
@@ -121,4 +122,38 @@ export async function batizar(drive_id: string): Promise<string | null> {
 export async function rejeitarSugestao(drive_id: string): Promise<void> {
   if (!supabase) return
   await supabase.from('brutos').upsert({ drive_id, sugestao_rejeitada: true, team: getTeam() }, { onConflict: 'drive_id' })
+}
+
+// ---- GRUPOS DE BRUTOS ----------------------------------------------------------------------
+// Três tomadas que são a MESMA peça (o professor cortou no meio, refez o final, gravou o gancho à
+// parte) viram um grupo. A partir daí elas andam juntas: ligar uma num card liga todas, e o batismo
+// numera as irmãs sozinho (BR-apelido, BR-apelido (2), BR-apelido (3)).
+// Depende da coluna `grupo_id` na tabela brutos; sem ela, tudo aqui é silenciosamente inofensivo.
+
+/** Une os brutos num grupo. Se algum já estava num grupo, todos entram nesse (funde em vez de criar outro). */
+export async function unirBrutos(ids: string[]): Promise<string | null> {
+  if (!supabase || ids.length < 2) return null
+  const { data } = await supabase.from('brutos').select('drive_id,grupo_id').in('drive_id', ids)
+  const existente = (data || []).map((b: { grupo_id: string | null }) => b.grupo_id).find(Boolean) || null
+  const grupo = existente || (crypto.randomUUID ? crypto.randomUUID() : 'g' + Date.now())
+  const { error } = await supabase.from('brutos').update({ grupo_id: grupo }).in('drive_id', ids)
+  return error ? null : grupo
+}
+
+/** Desfaz o grupo inteiro (todos voltam a ser avulsos). */
+export async function desunirGrupo(grupoId: string): Promise<boolean> {
+  if (!supabase || !grupoId) return false
+  const { error } = await supabase.from('brutos').update({ grupo_id: null }).eq('grupo_id', grupoId)
+  return !error
+}
+
+/** drive_ids que andam junto com este (inclui ele). Sem grupo, devolve só ele. */
+export async function irmaosDoGrupo(drive_id: string): Promise<string[]> {
+  if (!supabase) return [drive_id]
+  const { data: eu } = await supabase.from('brutos').select('grupo_id').eq('drive_id', drive_id).maybeSingle()
+  const g = eu?.grupo_id
+  if (!g) return [drive_id]
+  const { data } = await supabase.from('brutos').select('drive_id').eq('grupo_id', g)
+  const ids = (data || []).map((b: { drive_id: string }) => b.drive_id)
+  return ids.length ? ids : [drive_id]
 }
