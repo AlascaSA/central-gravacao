@@ -62,7 +62,9 @@ async function filhosDe(token, ids) {
 async function varrerCanais(token, raizId) {
   const canais = (await filhosDe(token, [raizId])).filter(ehDir)
   if (!canais.length) return []
-  const avs = (await filhosDe(token, canais.map((c) => c.id))).filter((f) => ehDir(f) && f.name.trim().toLowerCase() === 'audiovisual')
+  // aceita "Audiovisual" e "05. Audiovisual": a estrutura nova numera as pastas dentro do canal
+  const ehAudiovisual = (n) => (n || '').trim().replace(/^\d+\s*[.\-]\s*/, '').toLowerCase() === 'audiovisual'
+  const avs = (await filhosDe(token, canais.map((c) => c.id))).filter((f) => ehDir(f) && ehAudiovisual(f.name))
   if (!avs.length) return []
   const anos = (await filhosDe(token, avs.map((f) => f.id))).filter((f) => ehDir(f) && /^\d{4}$/.test(f.name.trim()) && Number(f.name.trim()) >= MIN_ANO_CANAIS)
   if (!anos.length) return []

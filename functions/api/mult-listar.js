@@ -21,7 +21,18 @@ export async function onRequest({ request, env }) {
     api.searchParams.set('driveId', SHARED_DRIVE_ID)
     const r = await fetch(api, { headers: { Authorization: 'Bearer ' + token } })
     const d = await r.json()
-    if (!r.ok) return Response.json({ error: d?.error?.message || 'erro no Drive' }, { status: 500 })
+    if (!r.ok) {
+      const msg = d?.error?.message || 'erro no Drive'
+      // 404 aqui quase sempre é permissão, não pasta inexistente: a conta de
+      // serviço só vê pasta que foi compartilhada com ela.
+      if (/not found/i.test(msg)) {
+        return Response.json({
+          error: 'Não tenho acesso a essa pasta. Compartilhe ela (ou o Drive do time) com ' +
+                 'brutos-reader@baixa-gravacoes.iam.gserviceaccount.com como Colaborador, e tente de novo.',
+        }, { status: 403 })
+      }
+      return Response.json({ error: msg }, { status: 500 })
+    }
     const videos = (d.files || []).map((f) => ({
       id: f.id,
       nome: f.name,

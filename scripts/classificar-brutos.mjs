@@ -46,10 +46,12 @@ function numDoNome(nome) {
   const m = s.match(/^C0*(\d+)/i) || s.match(/^0*(\d+)/)
   return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER
 }
-// brutos que já têm proxy no Drive, EM ORDEM DE GRAVAÇÃO (número do clipe, não a data do upload) —
-// a classificação vê o vizinho anterior/próximo pra pegar regravação, então a ordem tem que ser a sequência real.
+// TODOS os brutos, EM ORDEM DE GRAVAÇÃO (número do clipe, não a data do upload) — a classificação vê
+// o vizinho anterior/próximo pra pegar regravação, então a ordem tem que ser a sequência real.
+// Antes só entrava quem JÁ TINHA PROXY, e por isso a classificação ficava atrás de reencodar tudo em
+// 720p. Ela não precisa de vídeo: precisa de áudio 16kHz mono. Sem proxy, tira do próprio original.
 async function listarBrutos() {
-  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado&proxy_id=not.is.null&team=eq.${TEAM}`))
+  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado&team=eq.${TEAM}`))
   const arr = (Array.isArray(rows) ? rows : []).map((b) => ({
     id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id,
     num: numDoNome(b.nome_original || b.nome), criado: b.criado || '',
@@ -57,7 +59,7 @@ async function listarBrutos() {
   arr.sort((a, b) => (a.num - b.num) || a.criado.localeCompare(b.criado))
   return arr
 }
-// baixa o PROXY do Drive (alt=media com a conta de serviço)
+// baixa do Drive (alt=media com a conta de serviço). Recebe o proxy quando existe; senão o original.
 async function baixarProxy(proxyId, dest) {
   let ultErro
   for (let tent = 0; tent < 3; tent++) {
@@ -161,26 +163,36 @@ const exMap = new Map((Array.isArray(existentes) ? existentes : []).map((e) => [
 const exemplos = await jsonOf(await sb(`brutos_exemplos?select=transcricao,duracao,tipo&team=eq.${TEAM}&order=criado_em.desc&limit=12`))
 const fewshot = Array.isArray(exemplos) ? exemplos : []
 
-console.log(`${fila.length} brutos com proxy na fila, ${exMap.size} já no banco`)
+console.log(`${fila.length} brutos na fila (${fila.filter((b) => b.proxyId).length} com proxy, ${fila.filter((b) => !b.proxyId).length} direto do original), ${exMap.size} já no banco`)
 
-// PASSA 1: transcrição
-const itens = []
-for (const b of fila) {
-  const ja = exMap.get(b.id)
-  // re-transcreve se vazio (clipe grande que falhou o download fica '' e precisa refazer)
-  let transc = ja && ja.transcricao && !FORCE ? ja.transcricao : null
-  if (transc === null) {
-    const tmp = path.join(TMP, b.id + '.mp4')
-    try {
-      process.stdout.write(`• ${b.nome} transcrevendo… `)
-      await baixarProxy(b.proxyId, tmp)
-      transc = await transcrever(tmp)
-      await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, team: TEAM, atualizado_em: new Date().toISOString() })
-      console.log(transc ? `"${transc.slice(0, 50)}${transc.length > 50 ? '…' : ''}"` : '(silêncio)')
-    } catch (e) { console.log('ERRO transc: ' + e.message); transc = '' } finally { fs.rmSync(tmp, { force: true }) }
+// PASSA 1: transcrição — EM PARALELO. Cada item é baixar do Drive + extrair áudio + Whisper: quase
+// tudo é espera de rede, então processar um por vez deixava a máquina parada. A ordem do array é
+// preservada (a passa 2 depende dela pra ver o vizinho). Concorrência baixa de propósito: o Whisper
+// da Groq é 30 chamadas/min no plano de graça, e 4 de cada vez não encosta nesse teto.
+const CONC = Number(process.env.CONC || 4)
+const itens = new Array(fila.length)
+let cursor = 0
+async function trabalhador() {
+  for (;;) {
+    const i = cursor++
+    if (i >= fila.length) return
+    const b = fila[i]
+    const ja = exMap.get(b.id)
+    // re-transcreve se vazio (clipe grande que falhou o download fica '' e precisa refazer)
+    let transc = ja && ja.transcricao && !FORCE ? ja.transcricao : null
+    if (transc === null) {
+      const tmp = path.join(TMP, b.id + '.mp4')
+      try {
+        await baixarProxy(b.proxyId || b.id, tmp) // sem proxy ainda: usa o original
+        transc = await transcrever(tmp)
+        await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, team: TEAM, atualizado_em: new Date().toISOString() })
+        console.log(`• ${b.nome} ${transc ? `"${transc.slice(0, 50)}${transc.length > 50 ? '…' : ''}"` : '(silêncio)'}`)
+      } catch (e) { console.log(`• ${b.nome} ERRO transc: ${e.message}`); transc = '' } finally { fs.rmSync(tmp, { force: true }) }
+    }
+    itens[i] = { b, transc: transc || '' }
   }
-  itens.push({ b, transc: transc || '' })
 }
+await Promise.all(Array.from({ length: Math.min(CONC, fila.length) }, trabalhador))
 
 // PASSA 2: classificação com anterior + próximo (pulada com --so-transcrever)
 if (!SO_TRANSC) {
