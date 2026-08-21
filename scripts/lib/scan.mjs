@@ -64,7 +64,10 @@ export async function listarVideos(token, raizes = BRUTOS_ROOTS) {
           if (iMes < 0) iMes = MESES_ABREV.findIndex((a) => new RegExp('^' + a + '\\b', 'i').test(nome)) // "JUL" → Julho
           if (iMes >= 0) mes = MESES[iMes]
           else if (/^\d{1,2}$/.test(nome) || /^dia\s*\d/i.test(nome)) dia = nome.replace(/^dia\s*/i, '').padStart(2, '0')
-          else if (dia && !bloco) bloco = nome // só o primeiro nível abaixo do dia vira bloco
+          // primeira pasta que não é mês, dia nem ano vira o bloco. O ano (2026) fica de fora senão
+          // ele viraria "bloco" na varredura completa; e a escopada começa DENTRO do dia, onde
+          // `dia` ainda é nulo — por isso a regra não pode depender de o dia já estar marcado.
+          else if (!/^\d{4}$/.test(nome) && !bloco) bloco = nome
           proximo.push({ id: f.id, mes, dia, bloco })
         } else if ((f.mimeType || '').includes('video')) {
           const criado = f.createdTime || f.modifiedTime || null
