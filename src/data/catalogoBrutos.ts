@@ -14,6 +14,7 @@ export interface Classificacao {
   tipo: TipoBruto | null // confirmado pelo humano
   confirmado: boolean
   card_id: string | null // tarefa ligada
+  comentario?: string | null // recado da tomada (sobe pro card ligado)
   grupo_id?: string | null // tomadas unidas: andam juntas pro card
   produto: string | null // triagem por produto (independente de card)
   sugestao_titulo: string | null // título curto que a IA gerou (pra proposta de card SR)
@@ -81,10 +82,20 @@ export async function listarBrutosDeCards(cardIds: string[]): Promise<{ drive_id
   return (data as { drive_id: string; nome: string | null; card_id: string; capa_url: string | null; mb: number | null }[]) || []
 }
 
-// Comentário numa tomada (bruto).
+// Comentário numa tomada (bruto). SOBE PRO CARD: o recado escrito na hora de classificar é
+// justamente o que o editor precisa ver, e ele trabalha pelo Quadro, não pelo Catálogo.
+// Não sobrescreve recado alheio: se o card já tem outro texto, o novo entra numa linha a mais.
 export async function comentarBruto(drive_id: string, comentario: string): Promise<void> {
   if (!supabase) return
-  await supabase.from('brutos').upsert({ drive_id, comentario, team: getTeam() }, { onConflict: 'drive_id' })
+  const txt = (comentario || '').trim()
+  await supabase.from('brutos').upsert({ drive_id, comentario: txt || null, team: getTeam() }, { onConflict: 'drive_id' })
+  const { data: b } = await supabase.from('brutos').select('card_id').eq('drive_id', drive_id).maybeSingle()
+  if (!b?.card_id || !txt) return
+  const { data: c } = await supabase.from('cards').select('comentario').eq('id', b.card_id).maybeSingle()
+  const atual = (c?.comentario || '').trim()
+  if (atual.includes(txt)) return // já está lá (reeditou e salvou de novo)
+  const novo = atual ? atual + '\n' + txt : txt
+  await supabase.from('cards').update({ comentario: novo }).eq('id', b.card_id)
 }
 
 // Humano confirma/corrige o tipo. Vira exemplo (few-shot) pras próximas classificações.

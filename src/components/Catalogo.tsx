@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
-import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, unirBrutos, irmaosDoGrupo, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
+import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, unirBrutos, irmaosDoGrupo, comentarBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
 import { getTeam, listarTimes } from '../data/team'
 import { store } from '../data/store'
 import ProdutoPicker from './ProdutoPicker'
@@ -451,7 +451,6 @@ export default function Catalogo() {
   // seleção múltipla + baixar originais em lote
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [baixando, setBaixando] = useState(false)
-  const [baixIdx, setBaixIdx] = useState(0)
   function toggleSel(id: string) {
     setSel((s) => {
       const n = new Set(s)
@@ -460,22 +459,32 @@ export default function Catalogo() {
       return n
     })
   }
+  // LOTE = PASTA NO DRIVE. Disparar N downloads seguidos no navegador é frágil: o Chrome/Safari
+  // bloqueia depois dos primeiros, cada arquivo vai pra pasta de Downloads solto e não dá pra retomar.
+  // Aqui o Google copia os arquivos dentro dele mesmo (nenhum byte passa por nós) e abre a pasta.
+  // Mesma mecânica que o Quadro já usava; o Catálogo tinha ficado pra trás. A pasta some em 12h.
+  const [erroLote, setErroLote] = useState('')
   async function baixarOriginais() {
-    if (!brutos) return
+    if (!brutos || baixando) return
     const alvo = brutos.filter((b) => sel.has(b.id))
+    if (!alvo.length) return
     setBaixando(true)
-    for (let k = 0; k < alvo.length; k++) {
-      setBaixIdx(k + 1)
-      const a = document.createElement('a')
-      a.href = baixarUrl(alvo[k])
-      a.rel = 'noopener'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      await new Promise((r) => setTimeout(r, 1200))
+    setErroLote('')
+    // a aba abre ANTES do await, dentro do clique — senão o navegador barra como pop-up
+    const aba = window.open('', '_blank')
+    try {
+      const r = await fetch(`/api/pacote-drive?ids=${alvo.map((b) => b.id).join(',')}&team=${encodeURIComponent(getTeam())}`)
+      const d = await r.json()
+      if (!r.ok || !d.url) throw new Error(d.error || 'não consegui preparar')
+      if (aba) aba.location.href = d.url
+      else window.location.href = d.url
+    } catch (e) {
+      if (aba) aba.close()
+      setErroLote(e instanceof Error ? e.message : 'não consegui preparar')
+      setTimeout(() => setErroLote(''), 6000)
+    } finally {
+      setBaixando(false)
     }
-    setBaixando(false)
-    setBaixIdx(0)
   }
 
   // edição do nome
@@ -799,7 +808,9 @@ export default function Catalogo() {
                           <span className="tnum text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{blocos.get(k)!.length}</span>
                           <span className="h-px flex-1 bg-border" />
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{blocos.get(k)!.map(cardEl)}</div>
+                        {/* índice da lista COMPLETA: o modal navega por posição, e contar por seção
+                            fazia o primeiro card de cada bloco abrir o primeiro vídeo do dia */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{blocos.get(k)!.map((v) => cardEl(v, videosVisiveis.indexOf(v)))}</div>
                       </div>
                     ))}
                   </div>
@@ -829,13 +840,15 @@ export default function Catalogo() {
                 {unindo ? 'unindo…' : `Unir ${sel.size}`}
               </button>
             )}
+            {erroLote && <span className="text-[12px] font-semibold text-red">{erroLote}</span>}
             <button
               onClick={baixarOriginais}
               disabled={baixando}
+              title="Junta numa pasta do Drive e abre pra você baixar de lá (some em 12h)"
               className="h-11 px-5 inline-flex items-center gap-2 rounded-xl bg-brand text-white font-bold text-[14px] shadow-[0_10px_30px_-6px_rgba(20,168,245,0.5)] active:scale-[0.98] transition-transform disabled:opacity-70"
             >
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6" /><path d="M4 20h16" /></svg>
-              {baixando ? `Baixando ${baixIdx}/${sel.size}…` : 'Baixar originais'}
+              {baixando ? 'Preparando…' : `Baixar ${sel.size} no Drive`}
             </button>
           </div>
         </div>
@@ -958,6 +971,60 @@ export default function Catalogo() {
                   {!proposto && !temTransc && (
                     <div className="text-[11px] text-muted mt-1.5">Ainda não classificado pela IA — você pode marcar manualmente.</div>
                   )}
+
+                  {/* Tomadas unidas a esta: quem está classificando precisa ver a peça inteira, não só
+                      o clipe aberto. Clicar pula direto pra outra tomada do grupo. */}
+                  {clA?.grupo_id && (() => {
+                    const irmas = (brutos || []).filter((v) => v.id !== aberto.id && classif[v.id]?.grupo_id === clA.grupo_id)
+                    if (!irmas.length) return null
+                    return (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">
+                          Unida a {irmas.length} tomada{irmas.length > 1 ? 's' : ''}
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {irmas.map((v) => {
+                            const i = videosVisiveis.findIndex((x) => x.id === v.id)
+                            return (
+                              <button
+                                key={v.id}
+                                onClick={() => i >= 0 && setIdx(i)}
+                                disabled={i < 0}
+                                title={i < 0 ? v.nome + ' (está em outro dia/filtro)' : 'Abrir ' + v.nome}
+                                className="shrink-0 w-[112px] text-left disabled:opacity-50"
+                              >
+                                <div className="relative aspect-video rounded-lg bg-surface-2 border border-border overflow-hidden">
+                                  {v.thumb && <img src={v.thumb} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                                  <span className="absolute bottom-0.5 right-0.5 tnum text-[10px] font-bold text-white bg-black/70 rounded px-1">{fmtDur(v.seg)}</span>
+                                </div>
+                                <div className="text-[11px] text-ink-2 truncate mt-0.5">{v.nome}</div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Recado da tomada. Vai junto pro card ligado — o editor trabalha pelo Quadro. */}
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Comentário {clA?.card_id && <span className="normal-case tracking-normal font-medium text-brand-2">— vai pro card</span>}</div>
+                    <textarea
+                      key={aberto.id}
+                      defaultValue={clA?.comentario || ''}
+                      onBlur={(e) => {
+                        const t = e.target.value
+                        if ((clA?.comentario || '') === t) return
+                        setClassif((m) => ({ ...m, [aberto.id]: { ...(m[aberto.id] || { drive_id: aberto.id }), comentario: t } as Classificacao }))
+                        comentarBruto(aberto.id, t)
+                          .then(() => { setAvisoNome(clA?.card_id ? 'Comentário salvo e enviado pro card' : 'Comentário salvo'); setTimeout(() => setAvisoNome(''), 3000) })
+                          .catch(() => { setAvisoNome('Não consegui salvar o comentário'); setTimeout(() => setAvisoNome(''), 4000) })
+                      }}
+                      rows={2}
+                      placeholder="Ex.: cortar os 3s do começo, ele tossiu no meio…"
+                      className="w-full rounded-lg bg-surface border border-border px-3 py-2 text-[13px] text-ink outline-none focus:border-brand/60 placeholder:text-muted resize-y"
+                    />
+                  </div>
 
                   <div className="mt-3 pt-3 border-t border-border">
                     <div className="flex items-center justify-between mb-1.5">
