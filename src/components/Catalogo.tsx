@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
-import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
+import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
+import { getTeam, listarTimes } from '../data/team'
 import { store } from '../data/store'
-import { CATEGORIAS, COPYS, type Card, type Categoria, type Copy } from '../types'
+import ProdutoPicker from './ProdutoPicker'
+import { CATEGORIAS, copysDoTime, type Card, type Categoria, type Copy } from '../types'
 import { semanaDeGravacao } from '../week'
+import { gravarParams, lerParam } from '../urlEstado'
+import CasarRoteiro from './CasarRoteiro'
 
 // download via worker da Cloudflare (link assinado): sem aviso de vírus, qualquer tamanho.
 const baixarUrl = (b: Bruto) => `/api/download-url?id=${b.id}&name=${encodeURIComponent(b.nome)}`
@@ -81,21 +85,100 @@ export default function Catalogo() {
   const [novaCat, setNovaCat] = useState<Categoria>('Conteúdo')
   const [novaCopy, setNovaCopy] = useState<Copy | undefined>(undefined)
   const [ligando, setLigando] = useState(false)
-  const [nav, setNav] = useState<{ mes: string | null; dia: string | null }>({ mes: null, dia: null })
-  function irPara(mes: string | null, dia: string | null) { setNav({ mes, dia }); setIdx(null) }
+  // a pasta aberta vive na URL (?mes=&dia=): recarregar continua aqui e o link pode ser compartilhado
+  const [nav, setNav] = useState<{ mes: string | null; dia: string | null }>(() => ({ mes: lerParam('mes'), dia: lerParam('dia') }))
+  function irPara(mes: string | null, dia: string | null) {
+    setNav({ mes, dia })
+    setIdx(null)
+    gravarParams({ mes, dia })
+  }
   const [proc, setProc] = useState<'idle' | 'indo' | 'ok' | 'erro'>('idle')
+  const [procFase, setProcFase] = useState('')
+  const [procPct, setProcPct] = useState(0)
   const [pastaLink, setPastaLink] = useState('')
-  async function processarNovos(pasta?: string) {
-    setProc('indo')
+  // pasta de brutos do time ativo (da tabela teams). "Processar novos" varre SÓ ela — nunca o Drive inteiro,
+  // pra não sugar (e marcar como deste time) os brutos dos outros professores.
+  const [brutosPadrao, setBrutosPadrao] = useState<string | null>(null)
+  // Rodada da IA em andamento — detectada no GitHub, então continua aparecendo mesmo se recarregar a
+  // página (antes o estado morria com o F5 e não dava pra saber se ainda estava identificando).
+  const [iaRodando, setIaRodando] = useState<{ fase: string } | null>(null)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const creepRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const alvoRef = useRef(0)
+  function pararPoll() {
+    if (pollRef.current) clearTimeout(pollRef.current)
+    if (creepRef.current) clearInterval(creepRef.current)
+    pollRef.current = null
+    creepRef.current = null
+  }
+  useEffect(() => () => pararPoll(), [])
+
+  // traduz a resposta do /api/processar-status numa fase amigável + % (base real dos passos concluídos)
+  function mapFase(d: { status: string; conclusion?: string; step?: string | null; stepIndex?: number; totalSteps?: number }): { fase: string; pct: number } {
+    if (d.status === 'pending' || d.status === 'queued') return { fase: 'Na fila do GitHub…', pct: 8 }
+    if (d.status === 'completed') return { fase: d.conclusion === 'success' ? 'Concluído' : 'Falhou no GitHub', pct: 100 }
+    const s = (d.step || '').toLowerCase()
+    let fase = 'Preparando o ambiente…'
+    if (s.includes('capa')) fase = 'Gerando capas dos vídeos…'
+    else if (s.includes('prox')) fase = 'Gerando prévias 720p…'
+    else if (s.includes('classificar') || s.includes('ia')) fase = 'IA transcrevendo e classificando…'
+    const base = d.totalSteps ? Math.round(((d.stepIndex || 0) / d.totalSteps) * 100) : 15
+    return { fase, pct: Math.max(12, base) }
+  }
+
+  // acompanha a rodada da Action (a cada 5s) até concluir; recarrega os brutos no fim
+  async function acompanhar(dispatchMs: number, tentativas = 0) {
     try {
-      const url = '/api/processar-brutos' + (pasta ? '?pasta=' + encodeURIComponent(pasta) : '')
-      const r = await fetch(url, { method: 'POST' })
-      setProc(r.ok ? 'ok' : 'erro')
-      if (r.ok && pasta) setPastaLink('')
+      const d = await (await fetch('/api/processar-status?since=' + dispatchMs)).json()
+      if (d.status === 'completed') {
+        pararPoll()
+        alvoRef.current = 100
+        setProcPct(100)
+        const ok = d.conclusion === 'success'
+        setProcFase(ok ? 'Concluído' : 'Falhou no GitHub')
+        setProc(ok ? 'ok' : 'erro')
+        listarBrutos().then(setBrutos).catch(() => {}) // os novos já entraram no banco
+        listarClassificacoes().then(setClassif).catch(() => {})
+        setTimeout(() => { setProc('idle'); setProcFase(''); setProcPct(0) }, 7000)
+        return
+      }
+      const { fase, pct } = mapFase(d)
+      setProcFase(fase)
+      alvoRef.current = pct
+      setProcPct((p) => Math.max(p, pct))
+    } catch {
+      /* erro de rede momentâneo: tenta de novo no próximo ciclo */
+    }
+    if (tentativas > 180) { pararPoll(); setProc('idle'); setProcFase('') ; return } // ~15min de teto
+    pollRef.current = setTimeout(() => acompanhar(dispatchMs, tentativas + 1), 5000)
+  }
+
+  async function processarNovos(pasta?: string) {
+    pararPoll()
+    setProc('indo')
+    setProcFase('Disparando no GitHub…')
+    setProcPct(4)
+    alvoRef.current = 4
+    const dispatchMs = Date.now()
+    try {
+      // sempre manda o time ativo (grava na coluna team dos brutos do lote)
+      // sem link manual, usa a pasta do time (nunca varre o Drive todo). Vazio só se o time não tiver pasta.
+      const alvo = (pasta ?? brutosPadrao ?? '').trim()
+      const qs = (alvo ? 'pasta=' + encodeURIComponent(alvo) + '&' : '') + 'team=' + encodeURIComponent(getTeam())
+      const r = await fetch('/api/processar-brutos?' + qs, { method: 'POST' })
+      if (!r.ok) { setProc('erro'); setProcFase(''); setTimeout(() => setProc('idle'), 5000); return }
+      if (pasta) setPastaLink('')
+      setProcFase('Na fila do GitHub…')
+      setProcPct(8)
+      alvoRef.current = 8
+      // creep suave entre os polls: nunca parece travado (sobe devagar rumo ao alvo da fase + um pouco)
+      creepRef.current = setInterval(() => setProcPct((p) => (p >= 99 ? p : Math.min(p + 0.4, alvoRef.current + 5))), 1200)
+      acompanhar(dispatchMs)
     } catch {
       setProc('erro')
+      setProcFase('')
+      setTimeout(() => setProc('idle'), 5000)
     }
-    setTimeout(() => setProc('idle'), 5000)
   }
 
   useEffect(() => {
@@ -104,6 +187,49 @@ export default function Catalogo() {
       .catch((e) => setErro(e instanceof Error ? e.message : 'erro'))
     listarClassificacoes().then(setClassif).catch(() => {})
     store.listCards().then(setCards).catch(() => {})
+  }, [])
+
+  // Detecta rodada da IA em andamento (inclusive uma disparada antes de recarregar a página) e
+  // acompanha até acabar, atualizando a lista sozinho. Sem isso, ao dar F5 os vídeos apareciam sem
+  // etiqueta e não dava pra saber se a IA ainda estava trabalhando ou se tinha parado.
+  useEffect(() => {
+    let vivo = true
+    let timer: ReturnType<typeof setTimeout> | null = null
+    async function ver() {
+      try {
+        const d = await (await fetch('/api/processar-status')).json()
+        if (!vivo) return
+        const ativo = d.status === 'queued' || d.status === 'in_progress'
+        if (ativo) {
+          setIaRodando({ fase: mapFase(d).fase })
+          timer = setTimeout(ver, 12000)
+        } else {
+          setIaRodando((antes) => {
+            // acabou de terminar (estava rodando e agora não está): recarrega pra trazer as etiquetas
+            if (antes) {
+              listarBrutos().then(setBrutos).catch(() => {})
+              listarClassificacoes().then(setClassif).catch(() => {})
+            }
+            return null
+          })
+          timer = setTimeout(ver, 45000)
+        }
+      } catch {
+        if (vivo) timer = setTimeout(ver, 45000)
+      }
+    }
+    ver()
+    return () => { vivo = false; if (timer) clearTimeout(timer) }
+  }, [])
+
+  // pré-preenche o campo de pasta com a pasta de brutos do time ativo (se o campo estiver vazio)
+  useEffect(() => {
+    listarTimes()
+      .then((times) => {
+        const t = times.find((x) => x.id === getTeam())
+        if (t?.brutosFolderId) setBrutosPadrao(t.brutosFolderId)
+      })
+      .catch(() => {})
   }, [])
 
   async function ligar(cardId: string) {
@@ -126,6 +252,12 @@ export default function Catalogo() {
     await ligarBruto(id, null).catch(() => {})
     const novo = await batizar(id)
     if (novo) setBrutos((bs) => (bs ? bs.map((b) => (b.id === id ? { ...b, nome: novo } : b)) : bs))
+  }
+  async function definirProduto(produto: string | null) {
+    if (!aberto) return
+    const id = aberto.id
+    setClassif((m) => ({ ...m, [id]: { ...(m[id] || { drive_id: id }), produto } as Classificacao }))
+    await definirProdutoBruto(id, produto).catch(() => {})
   }
   async function criarELigar() {
     const t = novaTarefa.trim()
@@ -169,6 +301,16 @@ export default function Catalogo() {
     setClassif((m) => ({ ...m, [b.id]: { ...(m[b.id] || { drive_id: b.id }), tipo, confirmado: true } as Classificacao }))
     try {
       await confirmarTipo(b.id, tipo, cl?.transcricao ?? null, b.seg)
+      // o nome do arquivo depende da classificação (descarte fica com nome de câmera, boa vira BR-…),
+      // então reclassificar precisa rebatizar na hora — antes só acontecia ao ligar/desligar a tarefa.
+      if (classif[b.id]?.card_id) {
+        const novo = await batizar(b.id)
+        if (novo) {
+          setBrutos((bs) => (bs ? bs.map((x) => (x.id === b.id ? { ...x, nome: novo } : x)) : bs))
+          setAvisoNome('Renomeado: ' + novo)
+          setTimeout(() => setAvisoNome(''), 4000)
+        }
+      }
     } finally {
       setSalvandoTipo(false)
     }
@@ -199,7 +341,12 @@ export default function Catalogo() {
   const [fSemana, setFSemana] = useState('')
   const filtrando = fTipo !== 'todas' || !!fProduto || !!fSemana
   const limparFiltros = () => { setFTipo('todas'); setFProduto(''); setFSemana('') }
-  const produtoDoBruto = (b: Bruto) => { const cid = classif[b.id]?.card_id; return cid ? cards.find((c) => c.id === cid)?.produto : undefined }
+  const produtoDoBruto = (b: Bruto) => {
+    const c = classif[b.id]
+    if (c?.produto) return c.produto // produto marcado direto no take (triagem, independe de card)
+    const cid = c?.card_id
+    return cid ? cards.find((x) => x.id === cid)?.produto : undefined
+  }
   const semanaDoBruto = (b: Bruto) => (b.criado ? semanaDeGravacao(new Date(b.criado)) : '')
   const filtrados = useMemo(() => {
     if (!brutos) return []
@@ -213,10 +360,29 @@ export default function Catalogo() {
   }, [brutos, classif, cards, fTipo, fProduto, fSemana])
 
   const videosVisiveis = filtrando ? filtrados : diaAtual ? diaAtual.videos : []
-  const produtosFiltro = [...new Set(cards.map((c) => c.produto).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b))
+  const produtosFiltro = [...new Set([...cards.map((c) => c.produto), ...Object.values(classif).map((c) => c.produto)].filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b))
   const semanasFiltro = [...new Set((brutos || []).map(semanaDoBruto).filter(Boolean))].sort().reverse()
 
   const aberto = idx != null ? videosVisiveis[idx] ?? null : null
+
+  // Link direto pro vídeo (?bruto=<id>): navega até a pasta dele e abre o player. Em duas etapas
+  // porque a lista visível só passa a conter o vídeo depois que a pasta muda.
+  const [brutoPend, setBrutoPend] = useState<string | null>(() => lerParam('bruto'))
+  useEffect(() => {
+    if (!brutoPend || !brutos) return
+    const b = brutos.find((x) => x.id === brutoPend)
+    if (!b) { setBrutoPend(null); return } // link de um vídeo que não está mais no catálogo
+    const { mes, dia } = mesDiaDe(b)
+    if (nav.mes !== mes || nav.dia !== dia) { setNav({ mes, dia }); return }
+    const i = videosVisiveis.findIndex((v) => v.id === brutoPend)
+    if (i >= 0) { setIdx(i); setBrutoPend(null) }
+  }, [brutoPend, brutos, nav, videosVisiveis])
+
+  // mantém ?bruto= em dia: quem abrir/fechar o player pode copiar direto da barra de endereço
+  useEffect(() => {
+    if (brutoPend) return
+    gravarParams({ bruto: aberto ? aberto.id : null })
+  }, [aberto, brutoPend])
   const temPrev = idx != null && idx > 0
   const temNext = idx != null && idx < videosVisiveis.length - 1
 
@@ -313,6 +479,39 @@ export default function Catalogo() {
     }
   }
 
+  // copia o link que abre ESTE vídeo aqui na plataforma (leva o time e a pasta; o player abre sozinho)
+  const [videoCopiado, setVideoCopiado] = useState(false)
+  async function copiarLinkVideo(b: Bruto) {
+    const u = new URL(window.location.origin)
+    u.searchParams.set('t', getTeam())
+    u.searchParams.set('v', 'catalogo')
+    u.searchParams.set('bruto', b.id)
+    try {
+      await navigator.clipboard.writeText(u.toString())
+      setVideoCopiado(true)
+      setTimeout(() => setVideoCopiado(false), 1800)
+    } catch { /* clipboard bloqueado */ }
+  }
+
+  // copia o endereço da pasta aberta pra mandar pra alguém (inclui o time, pra abrir no espaço certo)
+  const [linkCopiado, setLinkCopiado] = useState(false)
+  const [casarAberto, setCasarAberto] = useState(false)
+  async function copiarLinkPasta() {
+    const u = new URL(window.location.origin)
+    u.searchParams.set('t', getTeam())
+    u.searchParams.set('v', 'catalogo')
+    if (nav.mes) u.searchParams.set('mes', nav.mes)
+    if (nav.dia) u.searchParams.set('dia', nav.dia)
+    try {
+      await navigator.clipboard.writeText(u.toString())
+      setLinkCopiado(true)
+      setTimeout(() => setLinkCopiado(false), 1800)
+    } catch { /* clipboard bloqueado */ }
+  }
+
+  // quantos ainda não têm etiqueta (nem da IA, nem confirmada por gente)
+  const semAnalise = (brutos || []).filter((b) => !(classif[b.id]?.tipo || classif[b.id]?.ia_tipo)).length
+
   const navBtn = 'h-8 w-8 grid place-items-center rounded-lg bg-surface-2 border border-border text-muted disabled:opacity-30 hover:text-ink transition-colors text-[18px] leading-none'
 
   const cardEl = (b: Bruto, i: number) => {
@@ -333,10 +532,16 @@ export default function Catalogo() {
           <span role="checkbox" aria-checked={marcado} aria-label="Selecionar vídeo" onClick={(e) => { e.stopPropagation(); toggleSel(b.id) }} className={'tap absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' + (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-50 group-hover:opacity-100')}>
             {marcado && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
           </span>
-          {t && (
+          {t ? (
             <span className={'absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold backdrop-blur-sm ' + TIPO_META[t].badge + (confirmado ? '' : ' opacity-90')}>
               {!confirmado && <span className="text-[8px] font-semibold opacity-70">IA</span>}
               {TIPO_META[t].label}
+            </span>
+          ) : (
+            // ainda sem etiqueta: mostra que a IA vai passar por aqui (girando enquanto a rodada corre)
+            <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border border-white/20 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-bold text-white/80 backdrop-blur-sm">
+              {iaRodando && <span className="h-2.5 w-2.5 rounded-full border-[1.5px] border-white/30 border-t-white/90 animate-spin" />}
+              {iaRodando ? 'identificando' : 'sem análise'}
             </span>
           )}
         </div>
@@ -348,13 +553,13 @@ export default function Catalogo() {
 
   return (
     <div className="relative z-10 px-4 sm:px-6 pb-24 max-w-5xl mx-auto">
-      <div className="flex items-center gap-2 pt-3 pb-3">
+      <div className="faixa-toque flex flex-wrap items-center gap-2 pt-3 pb-3">
         <h2 className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-2">Brutos no Drive</h2>
         {brutos && <span className="tnum text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{brutos.length}</span>}
         {sel.size > 0 ? (
           <button onClick={() => setSel(new Set())} className="ml-auto text-[12px] font-medium text-muted hover:text-ink">Limpar seleção</button>
         ) : (
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
             <input
               value={pastaLink}
               onChange={(e) => setPastaLink(e.target.value)}
@@ -364,6 +569,14 @@ export default function Catalogo() {
             {pastaLink.trim() && (
               <button onClick={() => processarNovos(pastaLink.trim())} disabled={proc === 'indo'} className="shrink-0 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border bg-surface-2 border-border text-brand-2 hover:border-brand/50 disabled:opacity-60 transition-colors">Escanear pasta</button>
             )}
+            <button
+              onClick={() => setCasarAberto(true)}
+              title="Jogar um roteiro e ligar as gravações nele"
+              className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border bg-surface-2 border-border text-ink-2 hover:border-brand/50 hover:text-ink transition-colors"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 14h6" /></svg>
+              Casar roteiro
+            </button>
             <button
               onClick={() => processarNovos()}
               disabled={proc === 'indo'}
@@ -375,11 +588,44 @@ export default function Catalogo() {
               ) : (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" /></svg>
               )}
-              {proc === 'indo' ? 'Disparando…' : proc === 'ok' ? 'Disparado!' : proc === 'erro' ? 'Falhou' : 'Processar novos'}
+              {proc === 'indo' ? 'Processando…' : proc === 'ok' ? 'Concluído!' : proc === 'erro' ? 'Falhou' : 'Processar novos'}
             </button>
           </div>
         )}
       </div>
+
+      {proc === 'indo' && (
+        <div className="mb-3 rounded-xl border border-brand/20 bg-brand/[0.06] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-[12px] font-semibold text-brand-2 truncate">{procFase || 'Processando…'}</span>
+            <span className="tnum shrink-0 text-[12px] font-semibold text-muted">{Math.round(procPct)}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-brand to-brand-2 transition-[width] duration-700 ease-out" style={{ width: procPct + '%' }} />
+          </div>
+          <div className="text-[11px] text-muted mt-1.5">Roda na nuvem — pode fechar essa aba que continua processando.</div>
+        </div>
+      )}
+
+      {proc === 'ok' && procFase === 'Concluído' && (
+        <div className="mb-3 text-[12px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">Processamento concluído — os vídeos novos já estão no catálogo.</div>
+      )}
+
+      {/* Rodada da IA em andamento (sobrevive ao F5): diz o que está acontecendo e quantos faltam,
+          pra ninguém ficar olhando vídeo sem etiqueta sem saber se ainda vem análise. */}
+      {iaRodando && proc !== 'indo' && (
+        <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-brand/20 bg-brand/[0.06] px-3 py-2.5">
+          <span className="h-4 w-4 shrink-0 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
+          <span className="text-[12px] font-semibold text-brand-2 truncate">{iaRodando.fase}</span>
+          {semAnalise > 0 && (
+            <span className="tnum shrink-0 text-[12px] font-semibold text-muted">{semAnalise} sem etiqueta</span>
+          )}
+          <span className="hidden sm:block flex-1" />
+          <span className="hidden sm:block text-[11px] text-muted shrink-0">Atualiza sozinho quando terminar</span>
+        </div>
+      )}
+
+      {casarAberto && <CasarRoteiro onFechar={() => setCasarAberto(false)} onPronto={() => { listarBrutos().then(setBrutos).catch(() => {}); listarClassificacoes().then(setClassif).catch(() => {}) }} />}
 
       {erro && <div className="text-[13px] text-red bg-red/10 border border-red/20 rounded-xl p-3">{erro}</div>}
 
@@ -394,7 +640,7 @@ export default function Catalogo() {
       {brutos && brutos.length > 0 && (
         <>
           {/* filtros */}
-          <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <div className="faixa-toque flex items-center gap-1.5 flex-wrap mb-3">
             <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mr-0.5">Filtrar</span>
             <button onClick={() => setFTipo('todas')} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === 'todas' ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>Todas</button>
             {TIPOS.map((v) => (
@@ -430,6 +676,19 @@ export default function Catalogo() {
                 <button onClick={() => irPara(null, null)} className={nav.mes ? 'hover:text-ink' : 'text-ink font-bold'}>Catálogo</button>
                 {nav.mes && <><Chevron /><button onClick={() => irPara(nav.mes, null)} className={nav.dia ? 'hover:text-ink' : 'text-ink font-bold'}>{nav.mes}</button></>}
                 {nav.dia && <><Chevron /><span className="text-ink font-bold">Dia {nav.dia}</span></>}
+                {nav.mes && (
+                  <button
+                    onClick={copiarLinkPasta}
+                    title="Copiar o link desta pasta (abre direto aqui)"
+                    className={'tap ml-1.5 inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11.5px] font-bold transition-colors ' + (linkCopiado ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-border bg-surface-2 text-muted hover:text-ink hover:border-border-strong')}
+                  >
+                    {linkCopiado ? (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>link copiado</>
+                    ) : (
+                      <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7L12 19" /></svg>copiar link</>
+                    )}
+                  </button>
+                )}
               </div>
 
               {!nav.mes && (
@@ -477,7 +736,7 @@ export default function Catalogo() {
       {aberto && createPortal((
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
           <div className="fade-in absolute inset-0 bg-black/70" onClick={() => setIdx(null)} />
-          <div className="sheet-up relative w-full max-w-2xl h-[92vh] sm:h-[86vh] flex flex-col bg-elev border border-border-strong rounded-2xl p-3 sm:p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
+          <div className="sheet-up relative w-full max-w-2xl h-[calc(var(--vh-real,100vh)*0.92)] sm:h-[86vh] flex flex-col bg-elev border border-border-strong rounded-2xl p-3 sm:p-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex items-center gap-2 mb-3 shrink-0">
               <div className="flex items-center gap-1 shrink-0">
                 <button disabled={!temPrev} onClick={() => setIdx((i) => (i == null ? i : i - 1))} aria-label="Vídeo anterior" className={navBtn}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg></button>
@@ -512,6 +771,13 @@ export default function Catalogo() {
                 </>
               ) : (
                 <>
+                  <button
+                    onClick={() => copiarLinkVideo(aberto)}
+                    title="Copiar o link do vídeo no Drive (pra colar no ClickUp, Slack…)"
+                    className={'shrink-0 text-[12px] font-semibold rounded-lg px-3 py-1.5 border transition-colors ' + (videoCopiado ? 'text-green border-green/40 bg-green/10' : 'text-ink-2 bg-surface-2 border-border hover:border-border-strong hover:text-ink')}
+                  >
+                    {videoCopiado ? 'copiado' : 'Copiar link'}
+                  </button>
                   <a href={baixarUrl(aberto)} className="shrink-0 text-[12px] font-semibold text-brand-2 bg-surface-2 border border-border rounded-lg px-3 py-1.5 hover:border-brand/50 transition-colors">Baixar</a>
                   <button onClick={() => setIdx(null)} aria-label="Fechar" className="shrink-0 h-9 w-9 grid place-items-center rounded-xl bg-surface-2 border border-border text-muted hover:text-ink transition-colors">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
@@ -586,6 +852,14 @@ export default function Catalogo() {
                   )}
 
                   <div className="mt-3 pt-3 border-t border-border">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted">Produto</div>
+                      {clA?.produto && <button onClick={() => definirProduto(null)} className="text-[11px] text-muted hover:text-rose-300">tirar</button>}
+                    </div>
+                    <ProdutoPicker value={clA?.produto || undefined} onChange={(p) => definirProduto(p)} />
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-border">
                     <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Tarefa ligada</div>
                     {(() => {
                       const cardId = clA?.card_id || null
@@ -646,7 +920,7 @@ export default function Catalogo() {
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 mb-2">
                               <span className="text-[11px] font-bold uppercase tracking-wide text-muted mr-0.5">Copy</span>
-                              {COPYS.map((c) => (
+                              {copysDoTime(getTeam()).map((c) => (
                                 <button key={c} onClick={() => setNovaCopy(novaCopy === c ? undefined : c)} className={'text-[11px] font-semibold rounded-lg border px-2 py-1 transition-colors ' + (novaCopy === c ? 'text-brand-2 bg-brand/12 border-brand/40' : 'bg-surface-2 border-border text-muted hover:text-ink')}>{c}</button>
                               ))}
                             </div>

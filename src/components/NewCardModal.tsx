@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CATEGORIAS, COPYS, type Categoria, type Copy, type NovoCard } from '../types'
+import { CATEGORIAS, copysDoTime, type Categoria, type Copy, type NovoCard } from '../types'
+import { getTeam } from '../data/team'
 import ProdutoPicker from './ProdutoPicker'
 
 export default function NewCardModal({
@@ -64,7 +65,7 @@ export default function NewCardModal({
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center">
       <div className="fade-in absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="sheet-up relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
+      <div className="sheet-up relative w-full sm:max-w-md max-h-[calc(var(--vh-real,100vh)*0.9)] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong" />
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-5">Novo card</h3>
 
@@ -75,7 +76,7 @@ export default function NewCardModal({
 
         <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy <span className="font-normal text-muted/70">(opcional)</span></label>
         <div className="grid grid-cols-2 gap-2 mb-3">
-          {COPYS.map((c) => (
+          {copysDoTime(getTeam()).map((c) => (
             <button key={c} onClick={() => setCopy(copy === c ? undefined : c)} className={pill(copy === c)}>
               {c}
             </button>

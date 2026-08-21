@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { addWeeks, currentMonday, weekLabel } from '../week'
-import { CATEGORIAS, COPYS, URGENCIAS, type Categoria, type Copy, type Urgencia } from '../types'
+import { CATEGORIAS, copysDoTime, URGENCIAS, type Categoria, type Copy, type Urgencia } from '../types'
+import { getTeam } from '../data/team'
 
 export type VistaSemana = 'semana' | 'sem' | 'todas'
 export type FiltroCopy = Copy | 'Todas' | 'Sem roteiro'
 export type FiltroCat = Categoria | 'Todas'
 export type FiltroUrg = Urgencia | 'Todas'
 
-const COPY_OPCOES: FiltroCopy[] = ['Todas', ...COPYS, 'Sem roteiro']
+// por time: quem saiu da equipe some daqui, mas os cards dela continuam (aparecem em "Todas")
+const copyOpcoes = (): FiltroCopy[] => ['Todas', ...copysDoTime(getTeam()), 'Sem roteiro']
 const CAT_OPCOES: FiltroCat[] = ['Todas', ...CATEGORIAS]
 const URG_OPCOES: FiltroUrg[] = ['Todas', ...URGENCIAS]
 // "média" no dado = "Normal" pra equipe
@@ -70,16 +72,16 @@ export default function QuadroToolbar({
 
   return (
     <div className="relative z-20 shrink-0 border-b border-border/60 bg-surface/30">
-      <div className="flex items-center gap-1.5 px-4 sm:px-6 py-2.5">
+      <div className="faixa-toque flex flex-wrap items-center gap-2 sm:gap-1.5 px-4 sm:px-6 py-2.5">
         {/* período: controle fixo (fora da área que rola, pro menu não ser cortado) */}
-        <div className={'relative shrink-0 flex items-center rounded-lg border p-0.5 bg-surface ' + (ehSemana ? 'border-brand/40' : 'border-border')}>
+        <div className={'order-1 relative flex-1 sm:flex-none sm:shrink-0 flex items-center justify-between rounded-lg border p-0.5 bg-surface ' + (ehSemana ? 'border-brand/40' : 'border-border')}>
           <button onClick={() => onChangeSemana(addWeeks(base, -1), 'semana')} className={seta} aria-label="Semana anterior">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
           <button
             onClick={() => setMenuTempo((v) => !v)}
             title="Trocar período"
-            className={'px-2 min-w-[124px] text-center text-[12px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ' + (ehAtual ? 'text-brand-2' : 'text-ink')}
+            className={'flex-1 sm:flex-none px-1 sm:px-2 sm:min-w-[124px] text-center text-[12px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors ' + (ehAtual ? 'text-brand-2' : 'text-ink')}
           >
             {rotuloTempo}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className={'shrink-0 transition-transform ' + (menuTempo ? 'rotate-180' : '')}><path d="M6 9l6 6 6-6" /></svg>
@@ -100,11 +102,19 @@ export default function QuadroToolbar({
           )}
         </div>
 
-        <span className="shrink-0 w-px h-6 bg-border mx-0.5" />
-
-        {/* copy (pessoa) — área que rola na horizontal */}
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {COPY_OPCOES.map((op) => {
+        {/* copy (pessoa) — no mobile vai pra linha própria (largura total); no desktop rola no meio */}
+        {/* MOBILE: um seletor de uma linha — a grade de chips ocupava duas linhas do cabeçalho */}
+        <select
+          value={filtro}
+          onChange={(e) => onChangeFiltro(e.target.value as FiltroCopy)}
+          className="order-3 sm:hidden w-full h-11 rounded-xl bg-surface border border-border px-3 text-[13.5px] font-semibold text-ink outline-none focus:border-brand/60"
+        >
+          {copyOpcoes().map((op) => (
+            <option key={op} value={op}>{(op === 'Todas' ? 'Todas as copies' : op) + ' · ' + (op === 'Todas' ? counts.__total ?? 0 : counts[op] ?? 0)}</option>
+          ))}
+        </select>
+        <div className="hidden sm:order-2 sm:flex sm:w-auto sm:flex-1 min-w-0 items-center gap-1.5 overflow-x-auto border-l border-border pl-3 ml-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {copyOpcoes().map((op) => {
             const ativo = filtro === op
             const n = op === 'Todas' ? counts.__total ?? 0 : counts[op] ?? 0
             return (
@@ -116,8 +126,8 @@ export default function QuadroToolbar({
           })}
         </div>
 
-        {/* ações fixas à direita */}
-        <span className="shrink-0 w-px h-6 bg-border mx-0.5" />
+        {/* ações: no mobile à direita da linha do período; no desktop no fim */}
+        <div className="order-2 sm:order-3 sm:ml-1 flex items-center gap-1.5 shrink-0 sm:border-l sm:border-border sm:pl-3">
 
         {/* filtros por categoria e urgência (menu, fora da área que rola) */}
         <div className="relative shrink-0">
@@ -125,7 +135,7 @@ export default function QuadroToolbar({
             onClick={() => setMenuFiltros((v) => !v)}
             title="Filtrar por categoria e urgência"
             className={
-              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ' +
+              'inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 min-w-11 text-[12px] font-semibold transition-colors ' +
               (filtrosAtivos ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface/60 border-border text-ink-2 hover:border-border-strong hover:text-ink')
             }
           >
@@ -182,6 +192,7 @@ export default function QuadroToolbar({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             Novo
           </button>
+        </div>
         </div>
       </div>
     </div>

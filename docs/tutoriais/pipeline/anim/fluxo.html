@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>fluxo</title>
+<style>
+  :root{ --bg:#0a0c11; --card:#121722; --line:#1e2735; --txt:#e7eef8; --dim:#8b9bb4; --azul:#14a8f5; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:400 16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+  .palco{height:100vh;display:flex;align-items:center;justify-content:center;gap:36px;padding:0 64px}
+  .no{width:270px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:26px 22px;
+    text-align:center;opacity:0;transform:translateY(18px) scale(.96);
+    transition:opacity .55s cubic-bezier(.2,.7,.3,1), transform .55s cubic-bezier(.2,.7,.3,1)}
+  .no.on{opacity:1;transform:none}
+  .no .ic{height:74px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+  .no h3{margin:0 0 6px;font-size:20px;font-weight:650;letter-spacing:-.2px}
+  .no p{margin:0;font-size:14px;color:var(--dim);line-height:1.45}
+  .cam{width:66px;height:46px;border-radius:9px;background:#2a3242;position:relative;border:1px solid #3a4557}
+  .cam:after{content:"";position:absolute;right:-16px;top:9px;border-left:16px solid #2a3242;
+    border-top:13px solid transparent;border-bottom:13px solid transparent}
+  .cam:before{content:"";position:absolute;left:12px;top:13px;width:20px;height:20px;border-radius:50%;
+    border:3px solid #55627a}
+  .pasta{width:74px;height:56px;background:#f5b74d;border-radius:6px 10px 10px 10px;position:relative}
+  .pasta:before{content:"";position:absolute;top:-9px;left:0;width:34px;height:10px;background:#f5b74d;border-radius:5px 5px 0 0}
+  .floco{width:64px;height:64px}
+  .seta{flex:0 0 92px;height:3px;background:var(--line);position:relative;border-radius:2px;opacity:0;transition:opacity .3s}
+  .seta.on{opacity:1}
+  .seta i{position:absolute;inset:0;width:0;background:linear-gradient(90deg,var(--azul),#7cd4ff);border-radius:2px;
+    transition:width .75s cubic-bezier(.4,0,.2,1)}
+  .seta.go i{width:100%}
+  .seta b{position:absolute;right:-7px;top:-6px;width:0;height:0;opacity:0;
+    border-left:11px solid #7cd4ff;border-top:8px solid transparent;border-bottom:8px solid transparent;transition:opacity .3s .6s}
+  .seta.go b{opacity:1}
+  .caminho{position:absolute;left:0;right:0;bottom:74px;text-align:center;font-size:19px;color:var(--dim);
+    opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;letter-spacing:.2px}
+  .caminho.on{opacity:1;transform:none}
+  .caminho b{color:var(--txt);font-weight:600}
+  .caminho span{color:#4b586d;margin:0 10px}
+</style>
+</head>
+<body>
+  <div class="palco">
+    <div class="no" id="n1">
+      <div class="ic"><div class="cam"></div></div>
+      <h3>Gravou</h3><p>o material sai do cartão da câmera</p>
+    </div>
+    <div class="seta" id="s1"><i></i><b></b></div>
+    <div class="no" id="n2">
+      <div class="ic"><div class="pasta"></div></div>
+      <h3>Drive</h3><p>na pasta do especialista, por ano, mês e dia</p>
+    </div>
+    <div class="seta" id="s2"><i></i><b></b></div>
+    <div class="no" id="n3">
+      <div class="ic">
+        <svg class="floco" viewBox="0 0 24 24" fill="none" stroke="#14a8f5" stroke-width="1.8" stroke-linecap="round">
+          <path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1"/>
+        </svg>
+      </div>
+      <h3>Central</h3><p>lê a pasta e cataloga cada tomada</p>
+    </div>
+  </div>
+  <div class="caminho" id="cam">
+    Time Alasca <span>›</span> <b>Jaylton Lopes</b> <span>›</span> Vídeos brutos <span>›</span> 2026 <span>›</span> Agosto <span>›</span> 06
+  </div>
+<script>
+  function espera(ms){return new Promise(function(r){setTimeout(r,ms)})}
+  window.tocar = async function(){
+    document.getElementById('n1').classList.add('on'); await espera(700)
+    var s1=document.getElementById('s1'); s1.classList.add('on'); await espera(60); s1.classList.add('go'); await espera(800)
+    document.getElementById('n2').classList.add('on'); await espera(650)
+    document.getElementById('cam').classList.add('on'); await espera(900)
+    var s2=document.getElementById('s2'); s2.classList.add('on'); await espera(60); s2.classList.add('go'); await espera(800)
+    document.getElementById('n3').classList.add('on')
+    return 'fim'
+  }
+</script>
+</body>
+</html>

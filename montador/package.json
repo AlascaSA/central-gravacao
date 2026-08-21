@@ -1,0 +1,9 @@
+{
+  "name": "montador",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Monta as variações de anúncio fora da máquina do editor: Drive → ffmpeg → Drive.",
+  "scripts": { "start": "node index.js" },
+  "engines": { "node": ">=22" }
+}

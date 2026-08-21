@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CATEGORIAS, COPYS, URGENCIAS, type Categoria, type Copy, type Urgencia } from '../types'
+import { CATEGORIAS, copysDoTime, URGENCIAS, type Categoria, type Copy, type Urgencia } from '../types'
+import { getTeam } from '../data/team'
 import { store } from '../data/store'
 import { processarDoc } from '../data/ai'
 import ProdutoPicker from './ProdutoPicker'
@@ -26,6 +27,7 @@ export default function UploadModal({
   const [files, setFiles] = useState<File[]>([])
   const [rodando, setRodando] = useState(false)
   const [status, setStatus] = useState('')
+  const [pct, setPct] = useState(0)
   const [resultado, setResultado] = useState<{ cards: number; docs: number; erros: string[] } | null>(null)
 
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function UploadModal({
       setFiles([])
       setRodando(false)
       setStatus('')
+      setPct(0)
       setResultado(null)
     }
   }, [open, copyDefault])
@@ -56,14 +59,17 @@ export default function UploadModal({
     if (!files.length || rodando) return
     setRodando(true)
     setResultado(null)
+    setPct(2)
     let cards = 0
     const erros: string[] = []
     for (let i = 0; i < files.length; i++) {
       const f = files[i]
       try {
         setStatus('Subindo ' + f.name + ' (' + (i + 1) + '/' + files.length + ')…')
+        setPct(Math.round(((i + 0.15) / files.length) * 100))
         const doc = await store.uploadArquivo(f, copy)
         setStatus('IA lendo ' + f.name + '…')
+        setPct(Math.round(((i + 0.55) / files.length) * 100))
         const videos = await processarDoc({ url: doc.url, nome: doc.nome, copy })
         if (!videos.length) erros.push(f.name + ': nenhum vídeo encontrado')
         for (const v of videos) {
@@ -81,10 +87,12 @@ export default function UploadModal({
           })
           cards++
         }
+        setPct(Math.round(((i + 1) / files.length) * 100))
       } catch (e) {
         erros.push(f.name + ': ' + (e instanceof Error ? e.message : 'erro'))
       }
     }
+    setPct(100)
     setStatus('')
     setRodando(false)
     setResultado({ cards, docs: files.length, erros })
@@ -94,7 +102,7 @@ export default function UploadModal({
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center">
       <div className="fade-in absolute inset-0 bg-black/60" onClick={rodando ? undefined : onClose} />
-      <div className="sheet-up relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
+      <div className="sheet-up relative w-full sm:max-w-md max-h-[calc(var(--vh-real,100vh)*0.9)] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong" />
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-1">Subir roteiros</h3>
         <p className="text-[12px] text-muted mb-5">A IA lê cada documento e cria um card por vídeo.</p>
@@ -138,7 +146,7 @@ export default function UploadModal({
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-2 mt-1">Ajustes das tarefas</div>
             <label className="block text-[12px] font-semibold text-muted mb-1.5">Copy responsável</label>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              {COPYS.map((c) => (
+              {copysDoTime(getTeam()).map((c) => (
                 <button
                   key={c}
                   disabled={rodando}
@@ -192,9 +200,17 @@ export default function UploadModal({
             </div>
 
             {rodando && (
-              <div className="flex items-center gap-2 text-[13px] text-brand-2 mb-4">
-                <span className="h-4 w-4 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
-                {status || 'Processando…'}
+              <div className="mb-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 text-[13px] text-brand-2 min-w-0">
+                    <span className="h-4 w-4 shrink-0 rounded-full border-2 border-brand/30 border-t-brand animate-spin" />
+                    <span className="truncate">{status || 'Processando…'}</span>
+                  </div>
+                  <span className="tnum shrink-0 text-[13px] font-bold text-ink-2">{pct}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-surface-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-brand to-brand-2 transition-[width] duration-500 ease-out" style={{ width: pct + '%' }} />
+                </div>
               </div>
             )}
 

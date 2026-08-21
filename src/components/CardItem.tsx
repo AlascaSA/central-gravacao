@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import type { Card } from '../types'
+import type { Card, Fase } from '../types'
+import { labelFase } from '../data/team'
 import { viewerUrl } from '../viewer'
 import { corPontoProduto } from '../produtoCor'
 
@@ -47,6 +48,9 @@ export function CardView({
   selecionado,
   onToggleSel,
   semanaVista,
+  proxima,
+  onAvancar,
+  onEscolherFase,
 }: {
   card: Card
   onArchive: (id: string) => void
@@ -61,11 +65,18 @@ export function CardView({
   selecionado?: boolean
   onToggleSel?: (id: string) => void
   semanaVista?: string | null
+  /** Fase seguinte no fluxo do time — só existe se houver uma depois desta. */
+  proxima?: Fase | null
+  /** Avanço de um toque (só no celular, onde arrastar entre colunas não existe). */
+  onAvancar?: (card: Card) => void
+  /** Abre a lista de estágios pra pular ou voltar. */
+  onEscolherFase?: (card: Card) => void
 }) {
   const podeConcluir = card.fase === 'Finalizado' || card.fase === 'No tráfego'
   const [confirmar, setConfirmar] = useState(false)
+  // `card` é só um gancho estável pro tratamento de matéria (ver index.css, [data-fundo]).
   const base =
-    'group rounded-2xl border bg-surface p-3.5 select-none touch-none cursor-grab active:cursor-grabbing transition-[transform,box-shadow,border-color] duration-200 '
+    'card group rounded-2xl border bg-surface p-3.5 select-none touch-none cursor-grab active:cursor-grabbing transition-[transform,box-shadow,border-color] duration-200 '
   const interactive = !dragging && !overlay ? 'hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] active:scale-[0.985] ' : ''
   const stateCls = overlay
     ? 'border-brand/50 shadow-[0_18px_40px_-10px_rgba(0,0,0,0.7)] '
@@ -145,6 +156,31 @@ export function CardView({
               <span className="truncate">{d.nome}</span>
             </a>
           ))}
+        </div>
+      )}
+
+      {/* Andar no fluxo pelo toque. No computador o card se arrasta entre colunas; no celular não há
+          coluna vizinha pra soltar, então o movimento vira botão: um toque pro próximo estágio e
+          "Mover" pra escolher qualquer um (inclusive voltar). */}
+      {onEscolherFase && !overlay && (
+        <div className="mt-3 flex items-center gap-2">
+          {proxima && onAvancar && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onAvancar(card) }}
+              className="flex-1 min-w-0 min-h-11 inline-flex items-center justify-center gap-1.5 px-3 rounded-xl bg-brand/12 border border-brand/35 text-brand-2 font-bold text-[13px] active:scale-[0.98] transition-transform"
+            >
+              <span className="truncate">{labelFase(proxima)}</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+            </button>
+          )}
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onEscolherFase(card) }}
+            className={'min-h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink-2 font-semibold text-[13px] active:scale-[0.98] transition-transform ' + (proxima && onAvancar ? 'shrink-0' : 'flex-1')}
+          >
+            Mover…
+          </button>
         </div>
       )}
 
@@ -236,6 +272,9 @@ export default function DraggableCard({
   selecionado,
   onToggleSel,
   semanaVista,
+  proxima,
+  onAvancar,
+  onEscolherFase,
 }: {
   card: Card
   onArchive: (id: string) => void
@@ -246,6 +285,9 @@ export default function DraggableCard({
   selecionado?: boolean
   onToggleSel?: (id: string) => void
   semanaVista?: string | null
+  proxima?: Fase | null
+  onAvancar?: (card: Card) => void
+  onEscolherFase?: (card: Card) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id })
   return (
@@ -262,6 +304,9 @@ export default function DraggableCard({
       selecionado={selecionado}
       onToggleSel={onToggleSel}
       semanaVista={semanaVista}
+      proxima={proxima}
+      onAvancar={onAvancar}
+      onEscolherFase={onEscolherFase}
     />
   )
 }

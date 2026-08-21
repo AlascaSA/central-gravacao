@@ -17,7 +17,7 @@ const selCls = (ativo: boolean) =>
   'h-11 rounded-lg border bg-surface-2 px-2 text-[12px] outline-none cursor-pointer ' +
   (ativo ? 'border-brand/50 text-ink' : 'border-border text-muted')
 
-export default function Archive({ cards }: { cards: Card[] }) {
+export default function Archive({ cards, onOpen }: { cards: Card[]; onOpen: (c: Card) => void }) {
   const [busca, setBusca] = useState('')
   const [fProduto, setFProduto] = useState('')
   const [fCategoria, setFCategoria] = useState('')
@@ -106,7 +106,7 @@ export default function Archive({ cards }: { cards: Card[] }) {
             </div>
             <div className="flex flex-col gap-2">
               {grupos[ym].map((c) => (
-                <div key={c.id} className="rounded-xl border border-border bg-surface px-3.5 py-2.5 flex items-center gap-3">
+                <div key={c.id} onClick={() => onOpen(c)} title="Abrir detalhe" className="rounded-xl border border-border bg-surface px-3.5 py-2.5 flex items-center gap-3 cursor-pointer hover:border-border-strong hover:bg-surface-2/40 transition-colors">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       {c.comentario?.trim() && (
@@ -125,7 +125,7 @@ export default function Archive({ cards }: { cards: Card[] }) {
                     </div>
                   </div>
                   {c.documentos.length > 0 && (
-                    <a href={c.documentos[0].url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-brand-2 shrink-0">
+                    <a href={c.documentos[0].url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[12px] text-brand-2 shrink-0">
                       {c.documentos.length} doc{c.documentos.length > 1 ? 's' : ''}
                     </a>
                   )}

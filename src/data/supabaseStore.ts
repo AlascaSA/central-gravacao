@@ -1,6 +1,7 @@
 import type { Card, Categoria, Copy, Doc, Fase, Urgencia } from '../types'
 import { supabase } from './supabase'
 import type { Store } from './store'
+import { getTeam } from './team'
 
 // Linha do Postgres (snake_case) -> Card (camelCase)
 interface Row {
@@ -56,7 +57,7 @@ export function createSupabaseStore(): Store {
 
   return {
     async listCards() {
-      const { data, error } = await sb.from('cards').select('*').order('criado_em', { ascending: false })
+      const { data, error } = await sb.from('cards').select('*').eq('team', getTeam()).order('criado_em', { ascending: false })
       if (error) throw new Error(error.message)
       return (data as Row[]).map(toCard)
     },
@@ -77,6 +78,7 @@ export function createSupabaseStore(): Store {
           semana: input.semana ?? null,
           documentos: input.documentos ?? [],
           observacoes: input.observacoes ?? null,
+          team: getTeam(),
         })
         .select()
         .single()
@@ -204,7 +206,7 @@ export function createSupabaseStore(): Store {
     },
 
     async listarProdutos() {
-      const { data, error } = await sb.from('produtos').select('nome').order('nome')
+      const { data, error } = await sb.from('produtos').select('nome').eq('team', getTeam()).order('nome')
       if (error || !data) return []
       return (data as { nome: string }[]).map((p) => p.nome)
     },
@@ -212,7 +214,7 @@ export function createSupabaseStore(): Store {
     async salvarProduto(nome) {
       const n = nome.trim()
       if (!n) return
-      await sb.from('produtos').upsert({ nome: n }, { onConflict: 'nome' })
+      await sb.from('produtos').upsert({ nome: n, team: getTeam() }, { onConflict: 'nome,team' })
     },
 
     async deletarCard(id) {

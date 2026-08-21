@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getTeam } from './team'
 
 export interface Link {
   id: string
@@ -16,13 +17,13 @@ export interface NovoLink {
 
 export async function listarLinks(): Promise<Link[]> {
   if (!supabase) return []
-  const { data } = await supabase.from('links').select('*').order('criado_em', { ascending: true })
+  const { data } = await supabase.from('links').select('*').eq('team', getTeam()).order('criado_em', { ascending: true })
   return (data as Link[]) || []
 }
 
 export async function criarLink(l: NovoLink): Promise<Link | null> {
   if (!supabase) return null
-  const { data } = await supabase.from('links').insert(l).select().single()
+  const { data } = await supabase.from('links').insert({ ...l, team: getTeam() }).select().single()
   return (data as Link) || null
 }
 

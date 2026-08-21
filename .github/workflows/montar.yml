@@ -1,0 +1,32 @@
+name: Montar variações de anúncio
+
+# Dispara pelo botão da aba Multiplicar (via API) ou manualmente aqui no GitHub.
+# O pedido inteiro já está na tabela `montagens` do Supabase — aqui só chega o id.
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "id da montagem na tabela `montagens`"
+        required: true
+
+jobs:
+  montar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Garantir ffmpeg
+        run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
+      - name: Montar e devolver ao Drive
+        run: node scripts/montar-variacoes.mjs --job ${{ inputs.job }}
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          SUPA_SECRET: ${{ secrets.SUPA_SECRET }}
+          # o runner tem 2 vCPUs; mais que isso só faz as peças brigarem entre si
+          PARALELO: "2"

@@ -1,3 +1,5 @@
+import { getTeam } from './team'
+
 export interface Bruto {
   id: string
   nome: string
@@ -13,7 +15,8 @@ export interface Bruto {
 }
 
 export async function listarBrutos(): Promise<Bruto[]> {
-  const r = await fetch('/api/brutos')
+  if (!getTeam()) return [] // sem time escolhido: nada de brutos (evita o default 'jaylton' do endpoint com team vazio)
+  const r = await fetch('/api/brutos?team=' + encodeURIComponent(getTeam()))
   if (!r.ok) {
     const t = await r.json().catch(() => ({}))
     throw new Error(t.error || 'Erro ' + r.status)

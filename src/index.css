@@ -52,63 +52,209 @@ body::before {
     radial-gradient(70% 60% at 95% 0%, rgba(92, 196, 255, 0.08), transparent 55%);
 }
 
-/* números tabulares pra contadores não dançarem */
-.tnum { font-variant-numeric: tabular-nums; }
+/* ==========================================================================
+   DIREÇÕES VISUAIS EM TESTE — só ligam com ?fundo=linha|redacao (ver src/fundo.ts).
+   Sobrescrevem os tokens do @theme, então a paleta troca o app inteiro de uma vez.
+   Sem o parâmetro, nada abaixo se aplica.
+   ========================================================================== */
 
-/* expande a área de toque de botões-ícone pequenos pra ~44px sem mudar o visual */
-.tap { position: relative; }
-.tap::before { content: ''; position: absolute; inset: -8px; }
-
-/* vidro pra header/barras */
-.glass {
-  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
+/* ██████ LINHA — a cor é estrutura, não enfeite ███████████████████████████████
+   Inverte o valor: o CARD é o mais escuro da tela e a coluna é mais clara e tingida.
+   Cada fase tem sua cor, no trilho do card e no topo da coluna. Desligar a cor apagaria
+   a leitura do quadro, então ela nunca é "sutil demais pra notar". */
+html[data-fundo="linha"] {
+  --color-bg: #14171d;
+  --color-elev: #181c24;
+  --color-surface: #0b0d11;
+  --color-surface-2: #12151c;
+  --color-surface-3: #1a1f28;
+  --color-border: #222836;
+  --color-border-strong: #39414f;
+  --color-ink: #f2f5fa;
+  --color-ink-2: #b9c2d0;
+  --color-muted: #7f8b9c;
 }
+html[data-fundo="linha"] body::before,
+html[data-fundo="linha"] body::after { content: none; }
 
-/* foco acessível e consistente */
-:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
+/* a cor de cada fase (os cards herdam da coluna em que estão) */
+html[data-fundo="linha"] .coluna,
+html[data-fundo="linha"] .coluna-bloco { --linha: #14a8f5; }
+html[data-fundo="linha"] [data-fase="A gravar"] { --linha: #ffb648; }
+html[data-fundo="linha"] [data-fase="para Jaylton gravar"] { --linha: #8b7dff; }
+html[data-fundo="linha"] [data-fase="A editar"] { --linha: #14a8f5; }
+html[data-fundo="linha"] [data-fase="Em edição"] { --linha: #22c1c3; }
+html[data-fundo="linha"] [data-fase="Em revisão"] { --linha: #ff5c8a; }
+html[data-fundo="linha"] [data-fase="Finalizado"] { --linha: #2bd47f; }
+html[data-fundo="linha"] [data-fase="No tráfego"] { --linha: #5cc4ff; }
+
+html[data-fundo="linha"] .coluna {
+  background: color-mix(in oklab, var(--linha) 7%, #171b22);
+  border: 1px solid #20252f;
+  border-top: 2px solid var(--linha);
   border-radius: 8px;
 }
-
-/* entrada escalonada dos cards (um detalhe, não tudo se mexendo) */
-@keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+html[data-fundo="linha"] .coluna-titulo {
+  color: color-mix(in oklab, var(--linha) 60%, #ffffff);
+  letter-spacing: .10em;
 }
-.rise { animation: rise 0.42s var(--ease-out-expo) both; }
-
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-.fade-in { animation: fade-in 0.2s ease-out both; }
-
-@keyframes sheet-up {
-  from { opacity: 0; transform: translateY(24px) scale(0.98); }
-  to { opacity: 1; transform: none; }
+html[data-fundo="linha"] .coluna-contagem {
+  color: color-mix(in oklab, var(--linha) 42%, var(--color-muted));
+  font-size: 15px;
 }
-.sheet-up { animation: sheet-up 0.32s var(--ease-out-expo) both; }
+html[data-fundo="linha"] .coluna-ponto { display: none; }
 
-/* scrollbar discreta */
-::-webkit-scrollbar { height: 9px; width: 9px; }
-::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
-::-webkit-scrollbar-track { background: transparent; }
-
-/* barras do quadro: grossas e sempre visíveis pra dar pra agarrar e arrastar com o mouse */
-.scroll-quadro { scrollbar-width: auto; scrollbar-color: var(--color-border-strong) transparent; }
-.scroll-quadro::-webkit-scrollbar { width: 15px; height: 15px; }
-.scroll-quadro::-webkit-scrollbar-track { background: color-mix(in srgb, var(--color-bg) 60%, transparent); }
-.scroll-quadro::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
-  border-radius: 999px;
-  min-height: 48px;
-  min-width: 48px;
+html[data-fundo="linha"] .card {
+  background: #0b0d11;
+  border: 1px solid #222836;
+  border-left: 4px solid var(--linha);
+  border-radius: 0 8px 8px 0;
+  box-shadow: none;
 }
-.scroll-quadro::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
-.scroll-quadro::-webkit-scrollbar-thumb:active { background: var(--color-brand); }
-.scroll-quadro::-webkit-scrollbar-corner { background: transparent; }
-
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+html[data-fundo="linha"] .card:hover {
+  background: #0f131a;
+  border-color: color-mix(in oklab, var(--linha) 40%, #222836);
+  border-left-color: var(--linha);
 }
+
+/* ██████ REDAÇÃO — grafite morno, sem caixa ████████████████████████████████████
+   Nenhuma caixa: a fase vira manchete e o card vira verbete separado por régua.
+   A base sai do azul-noite para grafite morno — a janela do app deixa de ser irmã da
+   janela do Premiere, e pele em thumbnail lê como pele, não como pele sobre ciano. */
+html[data-fundo="redacao"] {
+  --color-bg: #121211;
+  --color-elev: #171716;
+  --color-surface: #1a1a18;
+  --color-surface-2: #232320;
+  --color-surface-3: #2c2c28;
+  --color-border: #26261f;
+  --color-border-strong: #3a3a32;
+  --color-ink: #f4f1ea;
+  --color-ink-2: #bdb9b0;
+  --color-muted: #7d7a72;
+  --color-brand: #1fb0ff;
+  --color-brand-2: #7fd4ff;
+}
+html[data-fundo="redacao"] body::before,
+html[data-fundo="redacao"] body::after { content: none; }
+
+html[data-fundo="redacao"] .coluna {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 0 16px;
+  gap: 0;
+}
+html[data-fundo="redacao"] .coluna-topo { padding-left: 16px; margin-bottom: 4px; }
+html[data-fundo="redacao"] .coluna-ponto { display: none; }
+html[data-fundo="redacao"] .coluna-titulo {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.022em;
+  text-transform: none;
+  color: var(--color-ink);
+}
+html[data-fundo="redacao"] .coluna-contagem { font-size: 13px; }
+
+/* card = verbete: sem fundo, sem borda, sem sombra. Só régua e ritmo. */
+html[data-fundo="redacao"] .card {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 13px 12px 15px 0;
+}
+html[data-fundo="redacao"] .card:hover {
+  background: rgba(255, 255, 255, .022);
+  transform: none;
+}
+/* sem caixa, o alvo de soltar precisa ficar óbvio */
+html[data-fundo="redacao"] .coluna.ring-2 {
+  background: rgba(31, 176, 255, .07);
+  border-left-color: var(--color-brand);
+}
+
+
+
+/* ==========================================================================
+   CÉU — cor profunda modelada por luz (?ceu=sepia|tinta|petroleo|grafite)
+   Técnica tirada da referência do usuário (site Globo da Morte): SEM grão.
+   Uma cor saturada e profunda + brilho suave no centro-alto + queda forte nos
+   cantos. A "textura" percebida vem da modelagem de luz sobre uma cor com
+   identidade — não de ruído. Os cards quase pretos da Linha recortam contra ela.
+   ========================================================================== */
+html[data-ceu] body::before,
+html[data-ceu] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  height: auto;
+  pointer-events: none;
+  z-index: 0;
+}
+/* a queda para os cantos é comum aos quatro: é ela que dá o volume */
+html[data-ceu] body::after {
+  background: radial-gradient(125% 95% at 50% 28%, transparent 30%, rgba(0, 0, 0, .55) 100%);
+}
+
+/* --- SÉPIA: couro/madeira. O tom da referência. --- */
+html[data-ceu="sepia"] { background-color: #352016; }
+html[data-ceu="sepia"] body::before {
+  background: radial-gradient(ellipse 92% 72% at 50% 20%, #543427 0%, #3d2519 46%, #24120c 100%);
+}
+
+/* --- TINTA: azul-tinta profundo, parente da marca mas muito mais fundo. --- */
+html[data-ceu="tinta"] { background-color: #17203a; }
+html[data-ceu="tinta"] body::before {
+  background: radial-gradient(ellipse 92% 72% at 50% 20%, #26355c 0%, #1a2440 46%, #0b1020 100%);
+}
+
+/* --- PETRÓLEO: verde-azulado escuro, tom de sala de projeção. --- */
+html[data-ceu="petroleo"] { background-color: #14302e; }
+html[data-ceu="petroleo"] body::before {
+  background: radial-gradient(ellipse 92% 72% at 50% 20%, #1e4542 0%, #163331 46%, #08201e 100%);
+}
+
+/* --- GRAFITE: carvão morno, o mais neutro — não interfere no julgamento de cor. --- */
+html[data-ceu="grafite"] { background-color: #262420; }
+html[data-ceu="grafite"] body::before {
+  background: radial-gradient(ellipse 92% 72% at 50% 20%, #38352f 0%, #2a2723 46%, #17150f 100%);
+}
+
+/* ==========================================================================
+   TOQUE — o professor usa isto no celular, de pé, com o polegar.
+   Dois problemas reais: controle pequeno demais pra acertar, e barra de navegação
+   que corta o último item (a pessoa tinha que girar o aparelho pra alcançar).
+   Só vale onde o ponteiro é grosso (dedo); no desktop nada muda.
+   ========================================================================== */
+@media (pointer: coarse) {
+  /* alvo confortável nas barras de navegação e ação (44px é o mínimo que o dedo acerta) */
+  .faixa-toque button,
+  .faixa-toque a,
+  .faixa-toque select,
+  header button {
+    min-height: 44px;
+  }
+  /* botão só de ícone: o quadrado precisa ter 44 nos dois lados, não só na altura */
+  .faixa-toque button:not(:has(> :not(svg))) { min-width: 44px; }
+  /* ícone continua do mesmo tamanho; quem cresce é a área que recebe o toque */
+  .tap::after { inset: -12px; }
+}
+
+/* Barra que rola na horizontal sem cortar o último item: encosta no fim com folga,
+   prende no item (snap) e esconde a barra de rolagem. */
+.faixa-rolante {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-padding-inline: 12px;
+}
+.faixa-rolante::-webkit-scrollbar { display: none; }
+.faixa-rolante > * { scroll-snap-align: start; flex-shrink: 0; }
+/* respiro no fim pra o último item nunca colar na borda da tela */
+.faixa-rolante::after { content: ''; flex: 0 0 4px; }

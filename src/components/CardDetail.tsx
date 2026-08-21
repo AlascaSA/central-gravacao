@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { Card, Categoria, Copy, Urgencia } from '../types'
-import { CATEGORIAS, COPYS, URGENCIAS } from '../types'
+import { CATEGORIAS, copysDoTime, URGENCIAS } from '../types'
+import { getTeam } from '../data/team'
 import { viewerUrl } from '../viewer'
 import { store } from '../data/store'
 import { listarBrutosDoCard, ligarBruto, comentarBruto, type BrutoLigado } from '../data/catalogoBrutos'
+import { listarEditadosDoCard, urlStreamEditado, type EditadoDoCard } from '../data/editados'
 import { CAT_COR } from './CardItem'
 import ProdutoPicker from './ProdutoPicker'
 import { addWeeks, currentMonday, weekLabel } from '../week'
@@ -16,8 +18,6 @@ const urgColor: Record<string, string> = {
 // "média" no dado = "Normal" pra equipe
 export const URG_LABEL: Record<Urgencia, string> = { alta: 'Alta', média: 'Normal', baixa: 'Baixa' }
 
-const SUPA = import.meta.env.VITE_SUPABASE_URL as string
-const proxyDe = (id: string) => `${SUPA}/storage/v1/object/public/proxies/${id}.mp4`
 // download via worker da Cloudflare (link assinado + só brutos): sem aviso de vírus, qualquer tamanho.
 const baixarDe = (id: string, nome: string) => `/api/download-url?id=${id}&name=${encodeURIComponent(nome)}`
 
@@ -44,6 +44,13 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
   const [urg, setUrg] = useState<Urgencia | undefined>(card?.urgencia)
   const [prod, setProd] = useState<string | undefined>(card?.produto)
   const [linked, setLinked] = useState<BrutoLigado[]>([])
+  const [editadosCard, setEditadosCard] = useState<EditadoDoCard[]>([])
+  const [playEd, setPlayEd] = useState<string | null>(null)
+  const [srcEd, setSrcEd] = useState<Record<string, string>>({})
+  const [erroEd, setErroEd] = useState<Set<string>>(new Set())
+  // player das tomadas: URL assinada do proxy (mesmo endpoint do Catálogo). erroTom = sem proxy/erro → fallback.
+  const [srcTom, setSrcTom] = useState<Record<string, string>>({})
+  const [erroTom, setErroTom] = useState<Set<string>>(new Set())
   const [playing, setPlaying] = useState<string | null>(null)
   const [tit, setTit] = useState(card?.titulo || '')
   const [editTit, setEditTit] = useState(false)
@@ -79,8 +86,18 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
     setCp(card?.copy)
     setSemR(!!card?.semRoteiro)
     setPlaying(null)
-    if (card) listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
-    else setLinked([])
+    if (card) {
+      listarBrutosDoCard(card.id).then(setLinked).catch(() => setLinked([]))
+      listarEditadosDoCard(card.id).then(setEditadosCard).catch(() => setEditadosCard([]))
+    } else {
+      setLinked([])
+      setEditadosCard([])
+    }
+    setPlayEd(null)
+    setSrcEd({})
+    setErroEd(new Set())
+    setSrcTom({})
+    setErroTom(new Set())
   }, [card?.id])
 
   useEffect(() => {
@@ -144,11 +161,35 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
       setTimeout(() => setCopiado(null), 1500)
     }).catch(() => {})
   }
+  async function tocarEd(id: string) {
+    if (playEd === id) { setPlayEd(null); return }
+    setPlayEd(id)
+    if (!srcEd[id]) {
+      const u = await urlStreamEditado(id)
+      if (u) setSrcEd((m) => ({ ...m, [id]: u }))
+      else setErroEd((s) => { const n = new Set(s); n.add(id); return n })
+    }
+  }
+  // toca uma tomada (bruto): resolve a URL do proxy leve via /api/preview-url; sem proxy → fallback (Drive/Baixar)
+  async function tocarTomada(id: string) {
+    if (playing === id) { setPlaying(null); return }
+    setPlaying(id)
+    if (!srcTom[id] && !erroTom.has(id)) {
+      try {
+        const r = await fetch('/api/preview-url?id=' + encodeURIComponent(id))
+        const d = r.ok ? await r.json() : null
+        if (d?.url) setSrcTom((m) => ({ ...m, [id]: d.url }))
+        else setErroTom((s) => new Set(s).add(id))
+      } catch {
+        setErroTom((s) => new Set(s).add(id))
+      }
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="fade-in absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="sheet-up relative w-full sm:max-w-lg bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] max-h-[86vh] flex flex-col shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
+      <div className="sheet-up relative w-full sm:max-w-lg bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] max-h-[calc(var(--vh-real,100vh)*0.86)] flex flex-col shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong shrink-0" />
 
         <div className="flex items-start gap-3 shrink-0">
@@ -185,7 +226,8 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
             </span>
           )}
           <button
-            onClick={() => copiar(`${window.location.origin}/?card=${card.id}`, 'card')}
+            // leva o time no link: sem ele, quem abre cai na tela de escolher especialista e o card não abre
+            onClick={() => copiar(`${window.location.origin}/?t=${encodeURIComponent(getTeam())}&card=${card.id}`, 'card')}
             title="Copiar link do card (pra colar na tarefa do ClickUp)"
             className={'shrink-0 self-center inline-flex items-center gap-1.5 rounded-xl border h-9 px-2.5 text-[12px] font-semibold transition-colors ' + (copiado === 'card' ? 'border-green/40 text-green bg-green/10' : 'border-border bg-surface-2 text-ink-2 hover:text-ink hover:border-border-strong')}
           >
@@ -205,7 +247,7 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
           {/* copy (responsável) + marcador sem roteiro */}
           <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-1.5">Copy</div>
           <div className="flex flex-wrap items-center gap-1.5 mb-4">
-            {COPYS.map((c) => (
+            {copysDoTime(getTeam()).map((c) => (
               <button
                 key={c}
                 onClick={() => trocarCopy(c)}
@@ -315,6 +357,42 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
             </div>
           )}
 
+          {/* vídeo editado (a peça final) */}
+          {editadosCard.length > 0 && (
+            <div className="mb-4">
+              <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-2">Vídeo editado ({editadosCard.length})</div>
+              <div className="flex flex-col gap-2">
+                {editadosCard.map((ed) => {
+                  const tocando = playEd === ed.id
+                  const st = ed.postado
+                    ? { t: 'Postado', c: 'text-emerald-300 bg-emerald-500/15' }
+                    : ed.revisado
+                      ? { t: 'Pronto', c: 'text-sky-300 bg-sky-500/15' }
+                      : { t: 'Em revisão', c: 'text-amber bg-amber/15' }
+                  return (
+                    <div key={ed.id} className="rounded-xl border border-border bg-surface p-2.5">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => tocarEd(ed.id)} className="shrink-0 h-8 w-8 grid place-items-center rounded-lg bg-surface-2 border border-border text-ink hover:border-brand/50 transition-colors">
+                          {tocando
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>}
+                        </button>
+                        <a href={driveLink(ed.id)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Abrir no Drive" className="text-[13px] font-semibold truncate flex-1 hover:text-brand-2 transition-colors">{ed.nome}</a>
+                        <span className={'shrink-0 text-[11px] font-bold rounded-md px-1.5 py-0.5 ' + st.c}>{st.t}</span>
+                        <a href={baixarDe(ed.id, (ed.nome || 'video').replace(/[/\\]/g, '-') + '.mp4')} className="shrink-0 text-[11px] font-semibold text-brand-2 hover:text-brand">Baixar</a>
+                      </div>
+                      {tocando && (srcEd[ed.id]
+                        ? <video src={srcEd[ed.id]} poster={`/api/thumb?id=${ed.id}`} controls autoPlay playsInline className="w-full mt-2 rounded-lg bg-black max-h-[46vh] object-contain" />
+                        : erroEd.has(ed.id)
+                          ? <div className="w-full mt-2 p-4 grid place-items-center rounded-lg bg-black text-center text-[12px] text-muted">Não consegui abrir aqui. <a href={driveLink(ed.id)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-brand-2 hover:text-brand underline ml-1">Abrir no Drive</a></div>
+                          : <div className="w-full mt-2 h-40 grid place-items-center rounded-lg bg-black"><div className="h-6 w-6 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" /></div>)}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* brutos ligados */}
           {linked.length > 0 && (
             <div className="mb-4">
@@ -326,12 +404,12 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                   return (
                     <div key={b.drive_id} className="rounded-xl border border-border bg-surface p-2.5">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setPlaying(tocando ? null : b.drive_id)} className="shrink-0 h-8 w-8 grid place-items-center rounded-lg bg-surface-2 border border-border text-ink hover:border-brand/50 transition-colors">
+                        <button onClick={() => tocarTomada(b.drive_id)} className="shrink-0 h-8 w-8 grid place-items-center rounded-lg bg-surface-2 border border-border text-ink hover:border-brand/50 transition-colors">
                           {tocando
                             ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
                             : <svg width="14" height="14" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>}
                         </button>
-                        <span className="text-[13px] font-semibold truncate flex-1">{b.nome || b.drive_id}</span>
+                        <a href={driveLink(b.drive_id)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Abrir no Drive" className="text-[13px] font-semibold truncate flex-1 hover:text-brand-2 transition-colors">{b.nome || b.drive_id}</a>
                         {t && <span className={'shrink-0 text-[11px] font-bold rounded-md px-1.5 py-0.5 ' + (TIPO_COR[t] ?? 'text-muted bg-surface-2')}>{t}</span>}
                         <button onClick={() => copiar(driveLink(b.drive_id), b.drive_id)} title="Copiar link do vídeo no Drive (pra colar no ClickUp)" className={'shrink-0 text-[11px] font-semibold ' + (copiado === b.drive_id ? 'text-green' : 'text-muted hover:text-ink')}>
                           {copiado === b.drive_id ? 'copiado' : 'link Drive'}
@@ -355,9 +433,25 @@ export default function CardDetail({ card, onClose }: { card: Card | null; onClo
                           {(b.comentario || '').trim() ? linkificar(b.comentario || '') : <span className="text-muted">Comentário da tomada…</span>}
                         </div>
                       )}
-                      {tocando && (
-                        <video src={proxyDe(b.drive_id)} controls autoPlay playsInline className="w-full mt-2 rounded-lg bg-black max-h-[40vh]" />
-                      )}
+                      {tocando && (srcTom[b.drive_id]
+                        ? <video
+                            src={srcTom[b.drive_id]}
+                            controls
+                            autoPlay
+                            playsInline
+                            onError={() => setErroTom((s) => new Set(s).add(b.drive_id))}
+                            className="w-full mt-2 rounded-lg bg-black max-h-[40vh]"
+                          />
+                        : erroTom.has(b.drive_id)
+                          ? <div className="w-full mt-2 p-4 grid place-items-center rounded-lg bg-black text-center text-[12px] text-muted">
+                              Prévia ainda não gerada.
+                              <span className="mt-0.5">
+                                <a href={driveLink(b.drive_id)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-brand-2 hover:text-brand underline">Abrir no Drive</a>
+                                <span className="mx-1.5 text-border-strong">·</span>
+                                <a href={baixarDe(b.drive_id, b.nome || 'video.mp4')} className="text-brand-2 hover:text-brand underline">Baixar</a>
+                              </span>
+                            </div>
+                          : <div className="w-full mt-2 h-40 grid place-items-center rounded-lg bg-black"><div className="h-6 w-6 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" /></div>)}
                     </div>
                   )
                 })}

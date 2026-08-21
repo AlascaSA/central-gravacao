@@ -8,10 +8,16 @@ import Archive from './components/Archive'
 import Catalogo from './components/Catalogo'
 import Links from './components/Links'
 import Editados from './components/Editados'
+import Virais from './components/Virais'
+import Multiplicar from './components/Multiplicar'
 import NewCardModal from './components/NewCardModal'
 import UploadModal from './components/UploadModal'
 import CardDetail from './components/CardDetail'
 import { addWeeks, currentMonday, nextMonday } from './week'
+import { gravarParams, lerParam } from './urlEstado'
+import RevisaoIA from './components/RevisaoIA'
+import { listarPropostas } from './data/revisao'
+import TesteVolume from './components/TesteVolume'
 
 export default function App() {
   const [cards, setCards] = useState<Card[]>([])
@@ -19,13 +25,28 @@ export default function App() {
   const [filtro, setFiltro] = useState<FiltroCopy>('Todas')
   const [filtroCat, setFiltroCat] = useState<Categoria | 'Todas'>('Todas')
   const [filtroUrg, setFiltroUrg] = useState<Urgencia | 'Todas'>('Todas')
-  const [vista, setVista] = useState<Vista>('quadro')
+  // a aba fica na URL (?v=): recarregar não volta pro Quadro e o link abre onde você estava
+  const [vista, setVista] = useState<Vista>(() => {
+    if (window.location.pathname.startsWith('/v/')) return 'videos'
+    const v = lerParam('v')
+    return v && (['quadro', 'arquivo', 'catalogo', 'links', 'videos', 'virais', 'multiplicar'] as const).includes(v as Vista) ? (v as Vista) : 'quadro'
+  })
+  function trocarVista(v: Vista) {
+    setVista(v)
+    // sair do catálogo limpa a pasta que estava aberta (senão voltaria numa pasta que não é da aba)
+    gravarParams({ v: v === 'quadro' ? null : v, ...(v === 'catalogo' ? {} : { mes: null, dia: null }) })
+  }
   const [modalOpen, setModalOpen] = useState(false)
   const [modalCopy, setModalCopy] = useState<Copy | undefined>(undefined)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [semMonday, setSemMonday] = useState(currentMonday())
   const [vistaSem, setVistaSem] = useState<VistaSemana>('semana')
   const [detailCard, setDetailCard] = useState<Card | null>(null)
+  // quantas tarefas montadas automaticamente ainda esperam aprovação
+  const [aRevisar, setARevisar] = useState(0)
+  const [revisaoAberta, setRevisaoAberta] = useState(false)
+  function contarRevisao() { listarPropostas().then((p) => setARevisar(p.length)).catch(() => {}) }
+  useEffect(() => { contarRevisao() }, [])
   const [selMode, setSelMode] = useState(false)
   const sigRef = useRef('')
   const abriuLinkRef = useRef(false)
@@ -137,9 +158,16 @@ export default function App() {
 
   async function handleMove(id: string, fase: Fase) {
     const antes = cards
-    setCards((cs) => cs.map((c) => (c.id === id ? { ...c, fase } : c)))
+    const card = cards.find((c) => c.id === id)
+    const cur = currentMonday()
+    // ao concluir (Finalizado/No tráfego) um card que ROLOU de uma semana passada, ele passa a
+    // viver na semana atual — senão sumiria da visão (o rollover só puxa o NÃO concluído).
+    const concluida = fase === 'Finalizado' || fase === 'No tráfego'
+    const novaSemana = concluida && card?.semana && card.semana < cur ? cur : null
+    setCards((cs) => cs.map((c) => (c.id === id ? { ...c, fase, ...(novaSemana ? { semana: novaSemana } : {}) } : c)))
     try {
       await store.moveCard(id, fase)
+      if (novaSemana) await store.moverSemana(id, novaSemana)
     } catch {
       setCards(antes)
     }
@@ -201,7 +229,7 @@ export default function App() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
-      <Header vista={vista} onVista={setVista} />
+      <Header vista={vista} onVista={trocarVista} />
 
       {vista === 'quadro' && (
         <QuadroToolbar
@@ -226,13 +254,15 @@ export default function App() {
         <div className="flex-1 grid place-items-center">
           <div className="h-7 w-7 rounded-full border-[3px] border-border-strong border-t-brand animate-spin" />
         </div>
+      ) : lerParam('teste') === 'volume' ? (
+        <div className="flex-1 min-h-0"><TesteVolume cards={ativosFiltrados} onOpen={setDetailCard} /></div>
       ) : vista === 'quadro' ? (
         <div className="flex-1 min-h-0">
           <Board cards={ativosFiltrados} selMode={selMode} scrollRef={boardRef} semanaVista={vistaSem === 'semana' ? semMonday : null} onMove={handleMove} onArchive={handleArchive} onPushSemana={handlePush} onDelete={handleDelete} onOpen={setDetailCard} />
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {vista === 'catalogo' ? <Catalogo /> : vista === 'links' ? <Links /> : vista === 'postar' ? <Editados modo="postar" /> : vista === 'postados' ? <Editados modo="postados" /> : <Archive cards={arquivados} />}
+          {vista === 'catalogo' ? <Catalogo /> : vista === 'links' ? <Links /> : vista === 'videos' ? <Editados /> : vista === 'virais' ? <Virais /> : vista === 'multiplicar' ? <Multiplicar /> : <Archive cards={arquivados} onOpen={setDetailCard} />}
         </div>
       )}
 
@@ -255,6 +285,18 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* fila de revisão: fica no Catálogo, que é onde as tomadas vivem — no Quadro só polui */}
+      {vista === 'catalogo' && aRevisar > 0 && (
+        <button
+          onClick={() => setRevisaoAberta(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+84px)] sm:bottom-6 right-4 sm:right-6 z-40 inline-flex items-center gap-2 rounded-2xl bg-amber/12 border border-amber/40 text-amber pl-3 pr-3.5 py-2.5 backdrop-blur-sm shadow-[0_10px_30px_-10px_rgba(0,0,0,0.6)] hover:bg-amber/20 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+          <span className="text-[13px] font-bold">{aRevisar} para revisar</span>
+        </button>
+      )}
+      {revisaoAberta && <RevisaoIA onFechar={() => setRevisaoAberta(false)} onMudou={() => { contarRevisao(); recarregar() }} />}
 
       {pendingDel.length > 0 && (
         <div role="status" className="fixed bottom-[calc(env(safe-area-inset-bottom)+84px)] sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 rounded-xl bg-elev border border-border-strong pl-4 pr-2 py-2 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.7)]">
