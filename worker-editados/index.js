@@ -64,7 +64,16 @@ async function varrerCanais(token, raizId) {
   if (!canais.length) return []
   // aceita "Audiovisual" e "05. Audiovisual": a estrutura nova numera as pastas dentro do canal
   const ehAudiovisual = (n) => (n || '').trim().replace(/^\d+\s*[.\-]\s*/, '').toLowerCase() === 'audiovisual'
-  const avs = (await filhosDe(token, canais.map((c) => c.id))).filter((f) => ehDir(f) && ehAudiovisual(f.name))
+  const nivel1 = await filhosDe(token, canais.map((c) => c.id))
+  const avs = nivel1.filter((f) => ehDir(f) && ehAudiovisual(f.name))
+  // UM NÍVEL A MAIS: a raiz nova tem a MARCA antes do canal ("Redes sociais / DPA / Instagram /
+  // 05. Audiovisual"). Quem não tem Audiovisual logo abaixo pode ser marca — desce mais um degrau.
+  // Assim uma marca nova entra sozinha, sem precisar cadastrar pasta a pasta.
+  const talvezMarcas = nivel1.filter((f) => ehDir(f) && !ehAudiovisual(f.name))
+  if (talvezMarcas.length) {
+    const nivel2 = await filhosDe(token, talvezMarcas.map((f) => f.id))
+    avs.push(...nivel2.filter((f) => ehDir(f) && ehAudiovisual(f.name)))
+  }
   if (!avs.length) return []
   const anos = (await filhosDe(token, avs.map((f) => f.id))).filter((f) => ehDir(f) && /^\d{4}$/.test(f.name.trim()) && Number(f.name.trim()) >= MIN_ANO_CANAIS)
   if (!anos.length) return []
@@ -241,7 +250,10 @@ async function sincronizarTime(env, time) {
       // marcador explícito manda sempre (é instrução, não palpite); sem ele, respeita quem moveu de aba na Central
       existRows.push({ drive_id: v.id, nome_arquivo: v.name, secao: marcada ?? secaoAtual.get(v.id) ?? v.secao, thumb, criado: v.createdTime || null, atualizado_em: now, autor_nome, autor_foto, card_id, card_titulo, team: time.id })
     } else {
-      const n = nomes.get(v.id) || { nome: null, descricao: null }
+      // quem não foi pra IA ganha o nome limpo do arquivo AQUI. Deixar nome_ia nulo fazia o arquivo
+      // contar como "novo" em toda varredura — e, pior, a seção era recalculada toda vez, desfazendo
+      // quem tivesse movido a peça de aba na mão.
+      const n = nomes.get(v.id) || { nome: limparNome(v.name), descricao: null }
       // arquivo novo: marcador > palavra no nome > pasta
       const secao = marcada ?? (ehCortePeloNome(v.name) ? 'corte' : v.secao)
       novosRows.push({ drive_id: v.id, nome_arquivo: v.name, secao, thumb, criado: v.createdTime || null, atualizado_em: now, nome_ia: n.nome, descricao: n.descricao, autor_nome, autor_foto, card_id, card_titulo, team: time.id })

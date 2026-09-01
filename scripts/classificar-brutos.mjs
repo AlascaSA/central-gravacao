@@ -98,6 +98,9 @@ async function transcrever(file) {
 
 const REGRAS = 'Categorias: "boa" (tomada limpa e usável de conteúdo), "erro" (errou/gaguejou/repetiu/recomeçou/teste de som/ajuste de câmera/silêncio/frase incompleta — qualquer coisa não-usável), "gancho" (só a frase de abertura curta pra prender atenção), "complemento" (continua o assunto/fala do clipe anterior). ' +
   'REGRA-CHAVE: compare o ATUAL com o PRÓXIMO — se o próximo refaz a MESMA fala, o ATUAL foi o erro (descarte) e o próximo é o bom; se o próximo traz conteúdo NOVO continuando o assunto, o ATUAL pode ser boa/gancho e o próximo é complemento. ' +
+  'MAS a regra do PRÓXIMO só vale entre tomadas de DURAÇÃO PARECIDA. Se o próximo é muito mais curto, ele NÃO é regravação — é recapitulação, resumo ou continuação, e o ATUAL continua bom. ' +
+  'TOMADA LONGA (2 min pra cima) quase nunca é descarte: ninguém grava 12 minutos e joga fora. Só marque "erro" numa tomada longa se a própria pessoa disser no FIM que vai refazer ("de novo", "foi mal", "não ficou legal", "vou gravar tudo de novo"). Repetição de estrutura no meio da fala ("o inventário demora porque X, demora porque Y") é figura de linguagem, não gagueira. ' +
+  'O FIM DA FALA decide: quem termina dizendo "de novo", "foi mal", "não ficou legal" está declarando descarte, seja qual for a duração. ' +
   'Transcrição vazia = clipe silencioso = "erro". Duração 4-6s costuma ser gancho ou erro; 30s+ tomada cheia.'
 
 // Apelido = o gancho/ideia central do clipe pra nomear o arquivo (o Renomeador anexa CAMPANHA-OBJETIVO-... depois).
@@ -206,9 +209,18 @@ for (let i = 0; i < itens.length; i++) {
   try {
     const c = await classificar(transc, b.seg, prev, next, fewshot)
     const tipos = ['boa', 'erro', 'gancho', 'complemento']
+    // TRAVA DA TOMADA LONGA: ninguém grava 2+ minutos e joga fora. Só aceita "erro" numa tomada longa
+    // se a própria pessoa declarar no FIM que vai refazer. Sem isso a IA descartava o corpo inteiro de
+    // uma VSL (12 min) porque o clipe seguinte recapitulava o assunto — leu resumo como regravação.
+    const fim = (transc || '').slice(-140).toLowerCase()
+    const declarouRefazer = /(de novo|foi mal|n[ãa]o ficou|vou gravar tudo|refazer|repetir|come[çc]ar de novo|corta(r)? essa|deixa eu refazer)/.test(fim)
     await upsert({
       drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: transc, team: TEAM,
-      ia_tipo: tipos.includes(c.tipo) ? c.tipo : 'erro', ia_tema: c.tema || null,
+      ia_tipo: (() => {
+        let t = tipos.includes(c.tipo) ? c.tipo : 'erro'
+        if (t === 'erro' && (b.seg || 0) >= 120 && !declarouRefazer) t = 'boa'
+        return t
+      })(), ia_tema: c.tema || null,
       ia_tags: Array.isArray(c.tags) ? c.tags : null, ia_resumo: c.resumo || null,
       ia_confianca: typeof c.confianca === 'number' ? c.confianca : null, ia_motivo: c.motivo || null,
       sugestao_titulo: (c.titulo && String(c.titulo).trim()) || null,

@@ -41,11 +41,12 @@ async function chamarGroq(env, texto, copy) {
     (copy || 'desconhecida') + ').\n' +
     'Extraia CADA video individual presente no documento.\n' +
     'Responda SOMENTE em JSON valido no formato:\n' +
-    '{"videos":[{"titulo":"...","campanha":"...","roteiro":"..."}]}\n' +
+    '{"videos":[{"titulo":"...","campanha":"...","inicio":"..."}]}\n' +
     'Regras:\n' +
     '- "titulo": titulo curto e claro do video (ate ~8 palavras).\n' +
     '- "campanha": a campanha/categoria se aparecer no documento, senao "".\n' +
-    '- "roteiro": o texto do roteiro daquele video, como esta no documento.\n' +
+    '- "inicio": as PRIMEIRAS 10 PALAVRAS do roteiro daquele video, copiadas EXATAMENTE do documento ' +
+    '(nao resuma, nao reescreva) — e por elas que o roteiro completo e recortado depois.\n' +
     '- Se o documento for de um unico video, retorne UM item.\n' +
     '- Nao invente videos que nao estao no texto. Nada fora do JSON.'
 
@@ -62,6 +63,10 @@ async function chamarGroq(env, texto, copy) {
     })
 
   let resp = await pedir(28000)
+  if (resp.status === 400) {
+    // JSON truncado: tenta de novo com menos documento — menos vídeos por resposta, saída menor
+    resp = await pedir(12000)
+  }
   if (resp.status === 429) {
     // O gpt-oss-120b tem teto de 8 mil tokens/min no plano gratis (o llama antigo dava
     // 12 mil), entao documento grande passa raspando. Em vez de perder o upload inteiro,
@@ -78,12 +83,49 @@ async function chamarGroq(env, texto, copy) {
   const content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '{}'
   let parsed
   try { parsed = JSON.parse(content) } catch { parsed = { videos: [] } }
-  const videos = Array.isArray(parsed.videos) ? parsed.videos : []
-  return videos.map((v) => ({
-    titulo: String(v.titulo || '').trim() || 'Sem titulo',
-    campanha: String(v.campanha || '').trim(),
-    roteiro: String(v.roteiro || '').trim(),
-  })).slice(0, 50)
+  const videos = (Array.isArray(parsed.videos) ? parsed.videos : []).slice(0, 50)
+
+  // O ROTEIRO É RECORTADO AQUI, não devolvido pela IA. Antes o prompt pedia o texto inteiro de volta
+  // dentro do JSON: num documento longo (VSL) a resposta estourava o limite de saída e o JSON vinha
+  // cortado — "completion tokens reached before generating a valid document". Agora a IA devolve só
+  // as primeiras palavras de cada vídeo e nós fatiamos o documento original entre uma marca e a outra.
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+  const alvo = norm(texto)
+  const marcas = videos.map((v) => {
+    const ini = norm(v.inicio).slice(0, 90)
+    return ini.length >= 12 ? alvo.indexOf(ini) : -1
+  })
+  // mapa de posição do texto normalizado -> posição no texto original (o normalizado colapsa espaços)
+  const mapa = []
+  {
+    let vazio = true
+    for (let i = 0; i < texto.length; i++) {
+      const c = texto[i]
+      const eSp = /\s/.test(c)
+      if (eSp) { if (!vazio) { mapa.push(i); vazio = true } }
+      else { mapa.push(i); vazio = false }
+    }
+  }
+  const paraOriginal = (pos) => (pos < 0 ? -1 : mapa[Math.min(pos, mapa.length - 1)] ?? -1)
+
+  return videos.map((v, i) => {
+    let roteiro = ''
+    const de = paraOriginal(marcas[i])
+    if (de >= 0) {
+      // vai até a marca do próximo vídeo que foi encontrada (ou até o fim do documento)
+      let ate = texto.length
+      for (let j = i + 1; j < marcas.length; j++) {
+        const p = paraOriginal(marcas[j])
+        if (p > de) { ate = p; break }
+      }
+      roteiro = texto.slice(de, ate).trim()
+    }
+    return {
+      titulo: String(v.titulo || '').trim() || 'Sem titulo',
+      campanha: String(v.campanha || '').trim(),
+      roteiro,
+    }
+  })
 }
 
 export async function onRequest({ request, env }) {

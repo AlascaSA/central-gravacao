@@ -401,8 +401,9 @@ export default function Catalogo() {
   const [fTipo, setFTipo] = useState<'todas' | TipoBruto>('todas')
   const [fProduto, setFProduto] = useState('')
   const [fSemana, setFSemana] = useState('')
-  const filtrando = fTipo !== 'todas' || !!fProduto || !!fSemana
-  const limparFiltros = () => { setFTipo('todas'); setFProduto(''); setFSemana('') }
+  const [busca, setBusca] = useState('')
+  const filtrando = fTipo !== 'todas' || !!fProduto || !!fSemana || !!busca.trim()
+  const limparFiltros = () => { setFTipo('todas'); setFProduto(''); setFSemana(''); setBusca('') }
   const produtoDoBruto = (b: Bruto) => {
     const c = classif[b.id]
     if (c?.produto) return c.produto // produto marcado direto no take (triagem, independe de card)
@@ -416,10 +417,20 @@ export default function Catalogo() {
       if (fTipo !== 'todas' && (classif[b.id]?.tipo || classif[b.id]?.ia_tipo) !== fTipo) return false
       if (fProduto && produtoDoBruto(b) !== fProduto) return false
       if (fSemana && semanaDoBruto(b) !== fSemana) return false
+      const q = busca.trim().toLowerCase()
+      if (q) {
+        // procura no nome do arquivo, no nome de câmera, no título do card ligado e na transcrição —
+        // achar "inventário" pelo que ele FALA é o que mais serve na hora de montar uma peça
+        const c = classif[b.id]
+        const cid = c?.card_id
+        const alvo = [b.nome, (b as { nomeOriginal?: string }).nomeOriginal, cid ? cards.find((x) => x.id === cid)?.titulo : '', c?.transcricao]
+          .filter(Boolean).join(' ').toLowerCase()
+        if (!alvo.includes(q)) return false
+      }
       return true
     }).sort((a, b) => numDoClipe(a.nome) - numDoClipe(b.nome))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brutos, classif, cards, fTipo, fProduto, fSemana])
+  }, [brutos, classif, cards, fTipo, fProduto, fSemana, busca])
 
   const videosVisiveis = filtrando ? filtrados : diaAtual ? diaAtual.videos : []
   const produtosFiltro = [...new Set([...cards.map((c) => c.produto), ...Object.values(classif).map((c) => c.produto)].filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b))
@@ -721,6 +732,21 @@ export default function Catalogo() {
         <>
           {/* filtros */}
           <div className="faixa-toque flex items-center gap-1.5 flex-wrap mb-3">
+            <div className="relative">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar vídeo…"
+                className={'h-11 w-[190px] rounded-lg border bg-surface-2 pl-8 pr-7 text-[12.5px] text-ink outline-none placeholder:text-muted transition-colors ' + (busca ? 'border-brand/50' : 'border-border focus:border-brand/50')}
+              />
+              {busca && (
+                <button onClick={() => setBusca('')} aria-label="Limpar busca" className="tap absolute right-1.5 top-1/2 -translate-y-1/2 h-5 w-5 grid place-items-center rounded text-muted hover:text-ink">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+              )}
+            </div>
+            <span className="w-px h-5 bg-border mx-0.5" />
             <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mr-0.5">Filtrar</span>
             <button onClick={() => setFTipo('todas')} className={'text-[12px] font-semibold rounded-lg px-2.5 py-1.5 border transition-colors ' + (fTipo === 'todas' ? 'bg-brand/12 border-brand/40 text-brand-2' : 'bg-surface-2 border-border text-muted hover:text-ink')}>Todas</button>
             {TIPOS.map((v) => (
