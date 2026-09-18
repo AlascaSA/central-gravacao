@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CATEGORIAS, copysDoTime, URGENCIAS, type Categoria, type Copy, type Urgencia } from '../types'
 import { getTeam } from '../data/team'
 import { store } from '../data/store'
@@ -29,6 +29,21 @@ export default function UploadModal({
   const [status, setStatus] = useState('')
   const [pct, setPct] = useState(0)
   const [resultado, setResultado] = useState<{ cards: number; docs: number; erros: string[] } | null>(null)
+  const [arrastando, setArrastando] = useState(false)
+  // dragenter/dragleave disparam a cada filho atravessado; o contador só zera quando o cursor sai da folha de verdade
+  const profundidade = useRef(0)
+
+  const ACEITA = /\.(docx|pdf|txt|md)$/i
+  // junta com os já escolhidos (sem repetir): dá pra arrastar de duas pastas em sequência
+  function adicionar(novos: File[]) {
+    const validos = novos.filter((f) => ACEITA.test(f.name))
+    if (!validos.length) return
+    setFiles((atual) => {
+      const chave = (f: File) => f.name + '\u0000' + f.size
+      const vistos = new Set(atual.map(chave))
+      return [...atual, ...validos.filter((f) => !vistos.has(chave(f)))]
+    })
+  }
 
   useEffect(() => {
     if (open) {
@@ -43,8 +58,19 @@ export default function UploadModal({
       setStatus('')
       setPct(0)
       setResultado(null)
+      setArrastando(false)
+      profundidade.current = 0
     }
   }, [open, copyDefault])
+
+  // com o modal aberto, soltar fora da folha não pode abrir o arquivo no navegador (troca a página inteira pelo PDF)
+  useEffect(() => {
+    if (!open) return
+    const bloquear = (e: DragEvent) => { e.preventDefault() }
+    window.addEventListener('dragover', bloquear)
+    window.addEventListener('drop', bloquear)
+    return () => { window.removeEventListener('dragover', bloquear); window.removeEventListener('drop', bloquear) }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -102,7 +128,26 @@ export default function UploadModal({
   return (
     <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center">
       <div className="fade-in absolute inset-0 bg-black/60" onClick={rodando ? undefined : onClose} />
-      <div className="sheet-up relative w-full sm:max-w-md max-h-[calc(var(--vh-real,100vh)*0.9)] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]">
+      <div
+        className="sheet-up relative w-full sm:max-w-md max-h-[calc(var(--vh-real,100vh)*0.9)] overflow-y-auto bg-elev border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom)+22px)] shadow-[0_-20px_60px_-20px_rgba(0,0,0,0.8)]"
+        onDragEnter={(e) => {
+          if (rodando || resultado || !e.dataTransfer.types.includes('Files')) return
+          profundidade.current++
+          setArrastando(true)
+        }}
+        onDragOver={(e) => { e.preventDefault(); if (!rodando && !resultado) e.dataTransfer.dropEffect = 'copy' }}
+        onDragLeave={() => {
+          profundidade.current = Math.max(0, profundidade.current - 1)
+          if (profundidade.current === 0) setArrastando(false)
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          profundidade.current = 0
+          setArrastando(false)
+          if (rodando || resultado) return
+          adicionar(Array.from(e.dataTransfer.files ?? []))
+        }}
+      >
         <div className="mx-auto sm:hidden mb-4 h-1 w-10 rounded-full bg-border-strong" />
         <h3 className="text-[18px] font-black tracking-[-0.02em] mb-1">Subir roteiros</h3>
         <p className="text-[12px] text-muted mb-5">A IA lê cada documento e cria um card por vídeo.</p>
@@ -111,8 +156,10 @@ export default function UploadModal({
           <>
             <label
               className={
-                'flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed py-6 mb-3 cursor-pointer transition-colors ' +
-                (files.length ? 'border-brand/50 bg-brand/5' : 'border-border-strong hover:border-brand/40')
+                'flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed py-6 mb-3 cursor-pointer transition-all ' +
+                (arrastando
+                  ? 'border-brand bg-brand/12 scale-[1.02] ring-[6px] ring-brand/15'
+                  : files.length ? 'border-brand/50 bg-brand/5' : 'border-border-strong hover:border-brand/40')
               }
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-2">
@@ -120,24 +167,34 @@ export default function UploadModal({
                 <path d="M4 20h16" />
               </svg>
               <span className="text-[14px] font-semibold text-ink">
-                {files.length ? files.length + ' documento' + (files.length > 1 ? 's' : '') + ' escolhido' + (files.length > 1 ? 's' : '') : 'Escolher documentos'}
+                {arrastando ? 'Solte aqui' : files.length ? files.length + ' documento' + (files.length > 1 ? 's' : '') + ' escolhido' + (files.length > 1 ? 's' : '') : 'Escolher documentos'}
               </span>
-              <span className="text-[12px] text-muted">.docx · .pdf · .txt — pode vários de uma vez</span>
+              <span className="text-[12px] text-muted">{arrastando ? 'os roteiros entram na lista' : '.docx · .pdf · .txt — arraste ou clique, pode vários de uma vez'}</span>
               <input
                 type="file"
                 multiple
                 accept=".docx,.pdf,.txt,.md"
                 disabled={rodando}
                 className="hidden"
-                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                onChange={(e) => { adicionar(Array.from(e.target.files ?? [])); e.target.value = '' }}
               />
             </label>
 
             {files.length > 0 && (
               <div className="flex flex-col gap-1 mb-4 max-h-28 overflow-y-auto">
                 {files.map((f, i) => (
-                  <div key={i} className="text-[12px] text-ink-2 bg-surface-2 border border-border rounded-lg px-2.5 py-1.5 truncate">
-                    {f.name}
+                  <div key={i} className="flex items-center gap-2 text-[12px] text-ink-2 bg-surface-2 border border-border rounded-lg pl-2.5 pr-1 py-1">
+                    <span className="flex-1 truncate">{f.name}</span>
+                    {!rodando && (
+                      <button
+                        type="button"
+                        aria-label={'Tirar ' + f.name}
+                        onClick={() => setFiles((atual) => atual.filter((_, j) => j !== i))}
+                        className="shrink-0 h-6 w-6 rounded-md text-muted hover:text-ink hover:bg-surface transition-colors leading-none"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

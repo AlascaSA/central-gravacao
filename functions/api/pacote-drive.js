@@ -91,10 +91,16 @@ export async function onRequest({ request, env }) {
     const mi = String(agora.getUTCMinutes()).padStart(2, '0')
     const nomePasta = `${dd}-${mm} ${hh}h${mi} — ${validos.length} vídeo${validos.length > 1 ? 's' : ''}`
 
-    const pasta = await drive(token, '?supportsAllDrives=true&fields=id,driveId', {
-      method: 'POST',
-      body: JSON.stringify({ name: nomePasta, mimeType: 'application/vnd.google-apps.folder', parents: [maeId] }),
-    })
+    // ?lote=<id> continua num lote JÁ criado, em vez de abrir outro. É como um pedido grande cabe:
+    // cada cópia é uma subrequisição e a Cloudflare corta a execução perto de 50, então o cliente
+    // manda em levas de 25 — a primeira cria a pasta, as seguintes despejam nela. Um link só no fim.
+    const loteId = (url.searchParams.get('lote') || '').trim()
+    const pasta = loteId
+      ? await drive(token, `/${loteId}?supportsAllDrives=true&fields=id,driveId`)
+      : await drive(token, '?supportsAllDrives=true&fields=id,driveId', {
+          method: 'POST',
+          body: JSON.stringify({ name: nomePasta, mimeType: 'application/vnd.google-apps.folder', parents: [maeId] }),
+        })
 
     // cópias em paralelo: é o Google copiando dentro dele mesmo, não trafega por aqui
     const res = await Promise.all(validos.map((id) =>
