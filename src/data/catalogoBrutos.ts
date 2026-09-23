@@ -16,6 +16,8 @@ export interface Classificacao {
   card_id: string | null // tarefa ligada
   comentario?: string | null // recado da tomada (sobe pro card ligado)
   grupo_id?: string | null // tomadas unidas: andam juntas pro card
+  divisao_id?: string | null // vídeo do projeto a que o take pertence (Vídeo 01, Vídeo 02…)
+  gravado_em?: string | null // horário real de gravação, lido do arquivo
   produto: string | null // triagem por produto (independente de card)
   sugestao_titulo: string | null // título curto que a IA gerou (pra proposta de card SR)
   sugestao_rejeitada: boolean | null // humano dispensou a proposta
@@ -167,4 +169,62 @@ export async function irmaosDoGrupo(drive_id: string): Promise<string[]> {
   const { data } = await supabase.from('brutos').select('drive_id').eq('grupo_id', g)
   const ids = (data || []).map((b: { drive_id: string }) => b.drive_id)
   return ids.length ? ids : [drive_id]
+}
+
+// ---------- divisões: os vídeos do projeto dentro de uma gravação ----------
+// A IA divide cada gravação em vídeos (todos os takes de cada um, bons e ruins); o nome é da pessoa.
+export interface Divisao {
+  id: string
+  nome: string
+  ordem: number | null
+}
+
+/** Divisões do time. [] enquanto a tabela não existir (o Catálogo cai nas subpastas, como antes). */
+export async function listarDivisoes(): Promise<Divisao[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.from('divisoes').select('id,nome,ordem').eq('team', getTeam())
+  if (error || !data) return []
+  return data as Divisao[]
+}
+
+export async function renomearDivisao(id: string, nome: string): Promise<boolean> {
+  if (!supabase || !id || !nome.trim()) return false
+  const { error } = await supabase.from('divisoes').update({ nome: nome.trim() }).eq('id', id)
+  return !error
+}
+
+/** Passa o take pra outro vídeo do projeto (a IA dividiu errado). */
+export async function moverParaDivisao(driveId: string, divisaoId: string): Promise<boolean> {
+  if (!supabase || !driveId || !divisaoId) return false
+  const { error } = await supabase.from('brutos').update({ divisao_id: divisaoId }).eq('drive_id', driveId)
+  return !error
+}
+
+/** Junta dois vídeos do projeto: os takes de `de` passam pra `para` e a divisão `de` some. */
+export async function juntarDivisao(de: string, para: string): Promise<boolean> {
+  if (!supabase || !de || !para || de === para) return false
+  const { error } = await supabase.from('brutos').update({ divisao_id: para }).eq('divisao_id', de)
+  if (error) return false
+  await supabase.from('divisoes').delete().eq('id', de)
+  return true
+}
+
+/** Cria um vídeo do projeto vazio (a pessoa arrasta os takes pra ele). */
+export async function criarDivisao(nome: string, ordem: number): Promise<Divisao | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase.from('divisoes').insert({ team: getTeam(), nome, ordem }).select('id,nome,ordem').single()
+  return error || !data ? null : (data as Divisao)
+}
+
+/** Passa vários takes pra um vídeo; vídeo que ficou sem nenhum take é apagado. */
+export async function moverVariosParaDivisao(driveIds: string[], para: string, origens: string[]): Promise<boolean> {
+  if (!supabase || !driveIds.length || !para) return false
+  const { error } = await supabase.from('brutos').update({ divisao_id: para }).in('drive_id', driveIds)
+  if (error) return false
+  for (const o of origens) {
+    if (o === para) continue
+    const { count } = await supabase.from('brutos').select('drive_id', { count: 'exact', head: true }).eq('divisao_id', o)
+    if (count === 0) await supabase.from('divisoes').delete().eq('id', o)
+  }
+  return true
 }

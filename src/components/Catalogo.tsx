@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { listarBrutos, renomearBruto, type Bruto } from '../data/brutos'
-import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, unirBrutos, irmaosDoGrupo, comentarBruto, type Classificacao, type TipoBruto } from '../data/catalogoBrutos'
+import { listarClassificacoes, confirmarTipo, ligarBruto, batizar, rejeitarSugestao, definirProdutoBruto, unirBrutos, irmaosDoGrupo, comentarBruto, listarDivisoes, renomearDivisao, moverParaDivisao, juntarDivisao, criarDivisao, moverVariosParaDivisao, type Classificacao, type TipoBruto, type Divisao } from '../data/catalogoBrutos'
 import { getTeam, listarTimes } from '../data/team'
 import { store } from '../data/store'
 import ProdutoPicker from './ProdutoPicker'
@@ -68,6 +68,92 @@ function FolderCard({ label, sub, onClick }: { label: string; sub: string; onCli
   )
 }
 
+// Um vídeo do projeto dentro da gravação: todos os takes dele (bons e ruins), com o nome editável.
+// Clicar no nome troca por um campo; Enter ou sair do campo salva, Esc desiste.
+function SecaoVideo({ nome, editavel, videos, classif, onRenomear, onJuntarAcima, destacado, onArrastarSobre, onSoltar, children }: {
+  nome: string
+  editavel: boolean
+  videos: Bruto[]
+  classif: Record<string, Classificacao>
+  onRenomear: (nome: string) => void
+  /** junta este vídeo ao de cima (a IA dividiu demais); ausente no primeiro */
+  onJuntarAcima?: () => void
+  destacado?: boolean
+  onArrastarSobre?: () => void
+  onSoltar?: (e: React.DragEvent) => void
+  children: React.ReactNode
+}) {
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState(nome)
+  useEffect(() => { if (!editando) setValor(nome) }, [nome, editando])
+  const salvar = () => {
+    setEditando(false)
+    const v = valor.trim()
+    if (v && v !== nome) onRenomear(v)
+  }
+  let bons = 0, erros = 0, semFala = 0
+  for (const v of videos) {
+    const c = classif[v.id]
+    const t = c?.tipo || c?.ia_tipo
+    if (t === 'erro') erros++
+    else if (t) bons++
+    else if (String(c?.ia_motivo || '').startsWith('sem fala')) semFala++
+  }
+  return (
+    <section
+      onDragOver={onSoltar ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onArrastarSobre?.() } : undefined}
+      onDrop={onSoltar ? (e) => { e.preventDefault(); onSoltar(e) } : undefined}
+      className={'rounded-2xl transition-colors ' + (destacado ? 'bg-brand/8 outline outline-2 outline-offset-8 outline-brand/60' : '')}
+    >
+      <div className="flex items-center gap-2.5 mb-3 flex-wrap">
+        {editando ? (
+          <input
+            autoFocus
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            onBlur={salvar}
+            onKeyDown={(e) => { if (e.key === 'Enter') salvar(); if (e.key === 'Escape') { setValor(nome); setEditando(false) } }}
+            aria-label="Nome do vídeo"
+            className="h-9 w-full sm:w-auto sm:min-w-[280px] rounded-lg bg-surface-2 border border-brand/60 px-2.5 text-[16px] font-bold text-ink outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={!editavel}
+            onClick={() => setEditando(true)}
+            title={editavel ? 'Renomear este vídeo' : undefined}
+            className="group/nome inline-flex items-center gap-1.5 min-h-9 rounded-lg -ml-1.5 px-1.5 text-[16px] font-bold text-ink tracking-[-0.01em] enabled:hover:bg-surface-2 transition-colors"
+          >
+            {nome}
+            {editavel && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted opacity-60 group-hover/nome:opacity-100 transition-opacity"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+            )}
+          </button>
+        )}
+        <span className="tnum text-[11px] font-bold text-brand-2 bg-brand/12 rounded-full px-2 py-0.5">{videos.length}</span>
+        <span className="tnum flex items-center gap-2.5 text-[12px] text-muted">
+          {bons > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />{bons} {bons > 1 ? 'bons' : 'bom'}</span>}
+          {erros > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-400" />{erros} erro{erros > 1 ? 's' : ''}</span>}
+          {semFala > 0 && <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-white/40" />{semFala} sem fala</span>}
+        </span>
+        <span className="h-px flex-1 min-w-6 bg-border" />
+        {onJuntarAcima && (
+          <button
+            type="button"
+            onClick={onJuntarAcima}
+            title="Os takes deste vídeo passam para o vídeo de cima"
+            className="inline-flex items-center gap-1.5 h-8 rounded-lg border border-border bg-surface px-2.5 text-[12px] font-semibold text-muted hover:text-ink hover:border-border-strong transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5" /><path d="M5 12l7-7 7 7" /></svg>
+            Juntar com o de cima
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">{children}</div>
+    </section>
+  )
+}
+
 function Chevron() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted"><path d="M9 18l6-6-6-6" /></svg>
 }
@@ -77,6 +163,7 @@ export default function Catalogo() {
   const [erro, setErro] = useState('')
   const [idx, setIdx] = useState<number | null>(null)
   const [classif, setClassif] = useState<Record<string, Classificacao>>({})
+  const [divisoes, setDivisoes] = useState<Divisao[]>([]) // vídeos do projeto dentro de cada gravação
   const [salvandoTipo, setSalvandoTipo] = useState(false)
   const [cards, setCards] = useState<Card[]>([])
   const [linkOpen, setLinkOpen] = useState(false)
@@ -138,7 +225,7 @@ export default function Catalogo() {
         setProcFase(ok ? 'Concluído' : 'Falhou no GitHub')
         setProc(ok ? 'ok' : 'erro')
         listarBrutos().then(setBrutos).catch(() => {}) // os novos já entraram no banco
-        listarClassificacoes().then(setClassif).catch(() => {})
+        listarClassificacoes().then(setClassif).catch(() => {}); listarDivisoes().then(setDivisoes).catch(() => {})
         setTimeout(() => { setProc('idle'); setProcFase(''); setProcPct(0) }, 7000)
         return
       }
@@ -185,7 +272,7 @@ export default function Catalogo() {
     listarBrutos()
       .then(setBrutos)
       .catch((e) => setErro(e instanceof Error ? e.message : 'erro'))
-    listarClassificacoes().then(setClassif).catch(() => {})
+    listarClassificacoes().then(setClassif).catch(() => {}); listarDivisoes().then(setDivisoes).catch(() => {})
     store.listCards().then(setCards).catch(() => {})
   }, [])
 
@@ -208,7 +295,7 @@ export default function Catalogo() {
             // acabou de terminar (estava rodando e agora não está): recarrega pra trazer as etiquetas
             if (antes) {
               listarBrutos().then(setBrutos).catch(() => {})
-              listarClassificacoes().then(setClassif).catch(() => {})
+              listarClassificacoes().then(setClassif).catch(() => {}); listarDivisoes().then(setDivisoes).catch(() => {})
             }
             return null
           })
@@ -432,7 +519,29 @@ export default function Catalogo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brutos, classif, cards, fTipo, fProduto, fSemana, busca])
 
-  const videosVisiveis = filtrando ? filtrados : diaAtual ? diaAtual.videos : []
+  // Dia dividido em vídeos do projeto: a lista segue a ordem das divisões e, dentro de cada uma, o
+  // horário real de gravação — o player anda pelos takes na mesma ordem em que aparecem na tela.
+  const divDoDia = useMemo(() => {
+    if (!diaAtual || !diaAtual.videos.some((v) => classif[v.id]?.divisao_id)) return null
+    const porId = new Map(divisoes.map((d) => [d.id, d]))
+    return { porId }
+  }, [diaAtual, classif, divisoes])
+  const videosDoDia = useMemo(() => {
+    if (!diaAtual) return []
+    if (!divDoDia) return diaAtual.videos
+    // seções na ordem do take mais antigo de cada vídeo: vídeo criado ou remontado à mão cai no lugar
+    // certo da gravação, sem depender do número do nome
+    const quando = (v: Bruto) => classif[v.id]?.gravado_em || v.criado || ''
+    const inicioDiv = new Map<string, string>()
+    for (const v of diaAtual.videos) {
+      const d = classif[v.id]?.divisao_id || ''
+      const q = quando(v)
+      if (!inicioDiv.has(d) || q < inicioDiv.get(d)!) inicioDiv.set(d, q)
+    }
+    const chave = (v: Bruto) => { const d = classif[v.id]?.divisao_id || ''; return d ? inicioDiv.get(d)! + '|' + d : '~' }
+    return [...diaAtual.videos].sort((a, b) => chave(a).localeCompare(chave(b)) || quando(a).localeCompare(quando(b)))
+  }, [diaAtual, divDoDia, classif])
+  const videosVisiveis = filtrando ? filtrados : videosDoDia
   const produtosFiltro = [...new Set([...cards.map((c) => c.produto), ...Object.values(classif).map((c) => c.produto)].filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b))
   const semanasFiltro = [...new Set((brutos || []).map(semanaDoBruto).filter(Boolean))].sort().reverse()
 
@@ -462,13 +571,65 @@ export default function Catalogo() {
   // seleção múltipla + baixar originais em lote
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [baixando, setBaixando] = useState(false)
-  function toggleSel(id: string) {
+  // Shift+clique marca o intervalo inteiro desde o último marcado — montar um vídeo com 20 takes
+  // seguidos é um clique no primeiro e um Shift+clique no último.
+  const ultimoSel = useRef<number | null>(null)
+  function toggleSel(id: string, faixa = false) {
+    const i = videosVisiveis.findIndex((v) => v.id === id)
     setSel((s) => {
       const n = new Set(s)
-      if (n.has(id)) n.delete(id)
+      if (faixa && ultimoSel.current != null && i >= 0) {
+        const [a, b] = [Math.min(ultimoSel.current, i), Math.max(ultimoSel.current, i)]
+        for (let k = a; k <= b; k++) n.add(videosVisiveis[k].id)
+      } else if (n.has(id)) n.delete(id)
       else n.add(id)
       return n
     })
+    if (i >= 0) ultimoSel.current = i
+  }
+
+  // ---- montar os vídeos do projeto à mão: selecionar vários e arrastar ----
+  const [arrastando, setArrastando] = useState<string[] | null>(null)
+  const [alvoDrop, setAlvoDrop] = useState<string | null>(null)
+  const divsDoDiaLista = divDoDia
+    ? ([...new Set(videosDoDia.map((v) => classif[v.id]?.divisao_id).filter(Boolean) as string[])].map((id) => divDoDia.porId.get(id)).filter(Boolean) as Divisao[])
+    : []
+  function iniciarArraste(e: React.DragEvent, id: string) {
+    const ids = sel.has(id) ? [...sel] : [id]
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', ids.join(','))
+    // etiqueta que acompanha o cursor: quantos takes vão junto
+    const et = document.createElement('div')
+    et.textContent = ids.length > 1 ? `${ids.length} takes` : '1 take'
+    et.style.cssText = 'position:fixed;top:-100px;left:-100px;padding:6px 12px;border-radius:10px;background:#14a8f5;color:#fff;font:700 13px system-ui'
+    document.body.appendChild(et)
+    e.dataTransfer.setDragImage(et, 10, 10)
+    setTimeout(() => et.remove(), 0)
+    setArrastando(ids)
+  }
+  const idsDoDrop = (e: React.DragEvent) => (e.dataTransfer.getData('text/plain') || '').split(',').filter(Boolean)
+  async function moverPara(ids: string[], para: string) {
+    setArrastando(null); setAlvoDrop(null)
+    if (!ids.length) return
+    let destino = para
+    if (para === 'novo') {
+      const nums = divsDoDiaLista.map((d) => Number((d.nome.match(/^V[íi]deo (\d+)$/i) || [])[1] || 0))
+      const n = Math.max(divsDoDiaLista.length, ...nums) + 1
+      const d = await criarDivisao('Vídeo ' + String(n).padStart(2, '0'), n)
+      if (!d) return
+      setDivisoes((ds) => [...ds, d])
+      destino = d.id
+    }
+    const origens = [...new Set(ids.map((id) => classif[id]?.divisao_id).filter(Boolean) as string[])]
+    setClassif((m) => {
+      const n = { ...m }
+      for (const id of ids) n[id] = { ...(n[id] || { drive_id: id }), divisao_id: destino } as Classificacao
+      return n
+    })
+    setSel(new Set())
+    const ok = await moverVariosParaDivisao(ids, destino, origens)
+    if (!ok) listarClassificacoes().then(setClassif).catch(() => {})
+    listarDivisoes().then(setDivisoes).catch(() => {})
   }
   // LOTE = PASTA NO DRIVE. Disparar N downloads seguidos no navegador é frágil: o Chrome/Safari
   // bloqueia depois dos primeiros, cada arquivo vai pra pasta de Downloads solto e não dá pra retomar.
@@ -602,7 +763,14 @@ export default function Catalogo() {
     const t = cl?.tipo || cl?.ia_tipo || null
     const confirmado = !!cl?.confirmado
     return (
-      <button key={b.id} onClick={() => setIdx(i)} className={'group text-left rounded-2xl border bg-surface p-3 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition-all ' + (marcado ? 'border-brand/70' : 'border-border hover:border-border-strong')}>
+      <button
+        key={b.id}
+        onClick={() => setIdx(i)}
+        draggable={!!divDoDia}
+        onDragStart={divDoDia ? (e) => iniciarArraste(e, b.id) : undefined}
+        onDragEnd={() => { setArrastando(null); setAlvoDrop(null) }}
+        className={'group text-left rounded-2xl border bg-surface p-3 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition-all ' + (marcado ? 'border-brand/70' : 'border-border hover:border-border-strong') + (arrastando?.includes(b.id) ? ' opacity-40' : '')}
+      >
         <div className="relative aspect-video rounded-xl bg-surface-2 border border-border overflow-hidden mb-2 grid place-items-center text-muted">
           <svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
           {b.thumb && <img src={b.thumb} alt="" loading="lazy" decoding="async" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} className="absolute inset-0 h-full w-full object-cover" />}
@@ -611,7 +779,7 @@ export default function Catalogo() {
               <svg width="15" height="15" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="white" /></svg>
             </span>
           </span>
-          <span role="checkbox" aria-checked={marcado} aria-label="Selecionar vídeo" onClick={(e) => { e.stopPropagation(); toggleSel(b.id) }} className={'tap absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' + (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-50 group-hover:opacity-100')}>
+          <span role="checkbox" aria-checked={marcado} aria-label="Selecionar vídeo" onClick={(e) => { e.stopPropagation(); toggleSel(b.id, e.shiftKey) }} className={'tap absolute top-1.5 left-1.5 h-5 w-5 rounded-md border grid place-items-center transition-all cursor-pointer ' + (marcado ? 'bg-brand border-brand opacity-100' : 'bg-black/45 border-white/50 opacity-50 group-hover:opacity-100')}>
             {marcado && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
           </span>
           {t ? (
@@ -623,7 +791,7 @@ export default function Catalogo() {
             // ainda sem etiqueta: mostra que a IA vai passar por aqui (girando enquanto a rodada corre)
             <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-md border border-white/20 bg-black/55 px-1.5 py-0.5 text-[10.5px] font-bold text-white/80 backdrop-blur-sm">
               {iaRodando && <span className="h-2.5 w-2.5 rounded-full border-[1.5px] border-white/30 border-t-white/90 animate-spin" />}
-              {iaRodando ? 'identificando' : 'sem análise'}
+              {iaRodando ? 'identificando' : String(cl?.ia_motivo || '').startsWith('sem fala') ? 'sem fala' : 'sem análise'}
             </span>
           )}
         </div>
@@ -716,7 +884,7 @@ export default function Catalogo() {
         </div>
       )}
 
-      {casarAberto && <CasarRoteiro onFechar={() => setCasarAberto(false)} onPronto={() => { listarBrutos().then(setBrutos).catch(() => {}); listarClassificacoes().then(setClassif).catch(() => {}) }} />}
+      {casarAberto && <CasarRoteiro onFechar={() => setCasarAberto(false)} onPronto={() => { listarBrutos().then(setBrutos).catch(() => {}); listarClassificacoes().then(setClassif).catch(() => {}); listarDivisoes().then(setDivisoes).catch(() => {}) }} />}
 
       {erro && <div className="text-[13px] text-red bg-red/10 border border-red/20 rounded-xl p-3">{erro}</div>}
 
@@ -816,7 +984,51 @@ export default function Catalogo() {
 
               {/* Dentro do dia, separa pelas subpastas que a pessoa criou no Drive ("parte 2", "ganchos").
                   Sem subpasta nenhuma, cai na grade única de sempre — nada muda pra quem não usa. */}
-              {nav.dia && (() => {
+              {nav.dia && divDoDia && (() => {
+                const secoes: { id: string; nome: string; videos: Bruto[] }[] = []
+                for (const v of videosVisiveis) {
+                  const id = classif[v.id]?.divisao_id || ''
+                  let sec = secoes[secoes.length - 1]
+                  if (!sec || sec.id !== id) { sec = { id, nome: id ? divDoDia.porId.get(id)?.nome || 'Vídeo' : 'Sem vídeo', videos: [] }; secoes.push(sec) }
+                  sec.videos.push(v)
+                }
+                return (
+                  <div className="flex flex-col gap-7">
+                    {secoes.map((sec, si) => (
+                      <SecaoVideo
+                        key={sec.id || 'sem'}
+                        nome={sec.nome}
+                        editavel={!!sec.id}
+                        videos={sec.videos}
+                        classif={classif}
+                        onRenomear={async (nome) => {
+                          setDivisoes((ds) => ds.map((d) => (d.id === sec.id ? { ...d, nome } : d)))
+                          if (!(await renomearDivisao(sec.id, nome))) listarDivisoes().then(setDivisoes).catch(() => {})
+                        }}
+                        destacado={!!arrastando && alvoDrop === (sec.id || 'sem')}
+                        onArrastarSobre={sec.id && arrastando ? () => setAlvoDrop(sec.id) : undefined}
+                        onSoltar={sec.id ? (e) => moverPara(idsDoDrop(e), sec.id) : undefined}
+                        onJuntarAcima={si > 0 && sec.id && secoes[si - 1].id ? async () => {
+                          const para = secoes[si - 1].id
+                          setClassif((m) => {
+                            const n = { ...m }
+                            for (const v of sec.videos) if (n[v.id]) n[v.id] = { ...n[v.id], divisao_id: para }
+                            return n
+                          })
+                          setDivisoes((ds) => ds.filter((d) => d.id !== sec.id))
+                          if (!(await juntarDivisao(sec.id, para))) {
+                            listarClassificacoes().then(setClassif).catch(() => {}); listarDivisoes().then(setDivisoes).catch(() => {})
+                          }
+                        } : undefined}
+                      >
+                        {/* índice da lista COMPLETA: o player navega por posição no dia */}
+                        {sec.videos.map((v) => cardEl(v, videosVisiveis.indexOf(v)))}
+                      </SecaoVideo>
+                    ))}
+                  </div>
+                )
+              })()}
+              {nav.dia && !divDoDia && (() => {
                 const blocos = new Map<string, typeof videosVisiveis>()
                 for (const v of videosVisiveis) {
                   const k = v.bloco || ''
@@ -847,13 +1059,57 @@ export default function Catalogo() {
         </>
       )}
 
+      {/* Enquanto arrasta: todos os vídeos do dia num lugar só, pra soltar sem precisar rolar a página,
+          e o "novo vídeo" pra criar um na hora com os takes arrastados. */}
+      {arrastando && divDoDia && (
+        <div className="glass fixed bottom-0 left-0 right-0 z-50 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border/70">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-2">Soltar {arrastando.length > 1 ? `os ${arrastando.length} takes` : 'o take'} em</div>
+            <div className="flex flex-wrap gap-2">
+              {divsDoDiaLista.map((d) => (
+                <div
+                  key={d.id}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setAlvoDrop(d.id) }}
+                  onDragLeave={() => setAlvoDrop((a) => (a === d.id ? null : a))}
+                  onDrop={(e) => { e.preventDefault(); moverPara(idsDoDrop(e), d.id) }}
+                  className={'h-11 px-4 inline-flex items-center rounded-xl border text-[13px] font-semibold transition-all ' + (alvoDrop === d.id ? 'bg-brand text-white border-brand scale-[1.04]' : 'bg-surface-2 border-border text-ink')}
+                >
+                  {d.nome}
+                </div>
+              ))}
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setAlvoDrop('novo') }}
+                onDragLeave={() => setAlvoDrop((a) => (a === 'novo' ? null : a))}
+                onDrop={(e) => { e.preventDefault(); moverPara(idsDoDrop(e), 'novo') }}
+                className={'h-11 px-4 inline-flex items-center gap-1.5 rounded-xl border-2 border-dashed text-[13px] font-bold transition-all ' + (alvoDrop === 'novo' ? 'bg-brand/15 border-brand text-brand-2 scale-[1.04]' : 'border-brand/50 text-brand-2')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                Novo vídeo
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* barra de seleção (some quando o player está aberto) */}
-      {sel.size > 0 && !aberto && (
+      {sel.size > 0 && !aberto && !arrastando && (
         <div className="glass fixed bottom-0 left-0 right-0 z-40 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border/70">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <span className="text-[13px] font-semibold">{sel.size} selecionado{sel.size > 1 ? 's' : ''}</span>
             <div className="flex-1" />
             <button onClick={() => setSel(new Set())} className="h-11 px-4 rounded-xl bg-surface-2 border border-border text-ink font-semibold text-[13px] hover:border-border-strong transition-all">Limpar</button>
+            {divDoDia && (
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) moverPara([...sel], e.target.value) }}
+                aria-label="Mover os selecionados para um vídeo"
+                className="h-11 max-w-[170px] rounded-xl bg-surface-2 border border-border px-3 text-[13px] font-semibold text-ink outline-none hover:border-border-strong"
+              >
+                <option value="">Mover para…</option>
+                {divsDoDiaLista.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                <option value="novo">+ Novo vídeo</option>
+              </select>
+            )}
             {/* Unir: as tomadas viram uma peça só. Depois disso, ligar uma num card leva todas. */}
             {sel.size > 1 && (
               <button
@@ -997,6 +1253,30 @@ export default function Catalogo() {
                   {!proposto && !temTransc && (
                     <div className="text-[11px] text-muted mt-1.5">Ainda não classificado pela IA — você pode marcar manualmente.</div>
                   )}
+
+                  {/* A IA dividiu a gravação em vídeos; se errou o lugar deste take, a pessoa troca aqui. */}
+                  {divDoDia && clA?.divisao_id && (() => {
+                    const doDia = [...new Set(videosDoDia.map((v) => classif[v.id]?.divisao_id).filter(Boolean) as string[])]
+                      .map((id) => divDoDia.porId.get(id)).filter(Boolean) as Divisao[]
+                    if (doDia.length < 2) return null
+                    return (
+                      <label className="mt-2.5 flex items-center gap-2 text-[12px] text-muted">
+                        <span className="shrink-0">Vídeo do projeto:</span>
+                        <select
+                          value={clA.divisao_id || ''}
+                          onChange={async (e) => {
+                            const para = e.target.value
+                            const id = aberto.id
+                            setClassif((m) => ({ ...m, [id]: { ...m[id], divisao_id: para } }))
+                            if (!(await moverParaDivisao(id, para))) listarClassificacoes().then(setClassif).catch(() => {})
+                          }}
+                          className="min-w-0 flex-1 max-w-[260px] h-8 rounded-lg bg-surface-2 border border-border px-2 text-[12px] text-ink outline-none focus:border-brand/60"
+                        >
+                          {doDia.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                        </select>
+                      </label>
+                    )
+                  })()}
 
                   {/* Tomadas unidas a esta: quem está classificando precisa ver a peça inteira, não só
                       o clipe aberto. Clicar pula direto pra outra tomada do grupo. */}
