@@ -264,7 +264,8 @@ async function trabalhador() {
       b.transc = await transcrever(tmp)
       b.novaTransc = true
       await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: b.transc, team: TEAM, atualizado_em: new Date().toISOString() })
-      console.log(`• ${b.nome} ${b.transc ? `"${b.transc.slice(0, 50)}${b.transc.length > 50 ? '…' : ''}"` : '(sem fala)'}`)
+      // o registro do GitHub é público: nome e tamanho, nunca o que a pessoa fala
+      console.log(`• ${b.nome} ${b.transc ? `(${b.transc.length} caracteres)` : '(sem fala)'}`)
     } catch (e) {
       // FALHA não é silêncio: não grava nada e não classifica. Fica pra próxima rodada.
       b.falhou = true
@@ -359,7 +360,8 @@ if (!SO_TRANSC) {
         if (t === 'erro' && (b.seg || 0) >= 120 && !fimRefaz.test(b.transc.slice(-160).toLowerCase())) t = 'boa'
         await gravar(b, c, t)
         nClass++
-        console.log(`✓ ${b.nome} ${durDe(b)} → ${t} (${c.confianca}) ${String(c.motivo || '').slice(0, 70)}`)
+        // o motivo cita a fala: só aparece na avaliação local, não no registro público do GitHub
+        console.log(`✓ ${b.nome} ${durDe(b)} → ${t} (${c.confianca})${AVALIAR ? ' ' + String(c.motivo || '').slice(0, 70) : ''}`)
       }
       if (faltou.length) {
         if (tentativa < 1) { for (const i of faltou) await rodarGrupo([i], tentativa + 1) }
@@ -400,7 +402,7 @@ if (!SO_TRANSC && !AVALIAR && !cotaAcabou) {
     for (const x of alvoTit) {
       try {
         const t = await tituloCurto(x.transcricao)
-        if (t) { await upsert({ drive_id: x.drive_id, team: TEAM, sugestao_titulo: t }); console.log(`  ${x.nome} → ${t}`) }
+        if (t) { await upsert({ drive_id: x.drive_id, team: TEAM, sugestao_titulo: t }); console.log(`  ${x.nome} → título salvo`) }
       } catch (e) { console.log(`  ${x.nome} erro: ${e.message}`); if (e instanceof CotaEsgotada) break }
     }
   }
