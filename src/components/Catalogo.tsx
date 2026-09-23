@@ -1250,6 +1250,13 @@ export default function Catalogo() {
                     })}
                     {confirmadoTipo && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 ml-0.5"><path d="M5 13l4 4L19 7" /></svg>}
                   </div>
+                  {/* clipe sem fala: a IA descreveu a imagem — é por ela que dá pra saber de qual vídeo é */}
+                  {!proposto && String(clA?.ia_resumo || '').startsWith('Imagem: ') && (
+                    <div className="flex items-start gap-2 mb-2.5 text-[12px] text-muted">
+                      <span className="shrink-0 inline-flex items-center rounded-md border border-white/20 bg-white/5 px-1.5 py-0.5 text-[11px] font-bold text-ink-2">sem fala</span>
+                      <span className="leading-snug">{clA!.ia_resumo!.slice(8)}</span>
+                    </div>
+                  )}
                   {!proposto && !temTransc && (
                     <div className="text-[11px] text-muted mt-1.5">Ainda não classificado pela IA — você pode marcar manualmente.</div>
                   )}
