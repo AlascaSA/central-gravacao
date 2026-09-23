@@ -191,7 +191,7 @@ function marcarAngulos(lista) {
       if (s > sob) { sob = s; melhor = y }
     }
     if (!melhor || sob < 0.5 * Math.min(fimDe(x) - x.inicio, fimDe(melhor) - melhor.inicio)) continue
-    if (!melhor.transc && x.transc) continue
+    if (semFalaUtil(melhor) && !semFalaUtil(x)) continue // o principal ficou mudo e o outro celular pegou a fala
     x.anguloDe = melhor
     ;(melhor.angulos ||= []).push(x)
   }
@@ -342,19 +342,45 @@ await Promise.all(Array.from({ length: Math.min(CONC, filaT.length) }, trabalhad
 const classificadoSemFala = (b) => b.ia_tipo && b.transc && b.atualizado < '2026-09-22' && /(transcri[çc][ãa]o vazia|sil[êe]ncio|sem [áa]udio|sem fala|clipe silencioso|nenhum conte[úu]do)/i.test(b.ia_motivo || '')
 const precisaBase = (b) => {
   if (b.falhou || b.transc == null) return false
+  if (!FORCE && !RECLASS && String(b.ia_motivo || '').startsWith(MOTIVO_SEM_FALA)) return false
   if (AVALIAR) return !!b.tipo
   if (FORCE || RECLASS || b.novaTransc || !b.ia_tipo) return true
   return !b.tipo && classificadoSemFala(b)
 }
-const precisaClassif = (b) => !b.anguloDe && precisaBase(b)
+const precisaClassif = (b) => !b.anguloDe && !b.semFala && precisaBase(b)
+// SEM FALA ÚTIL: a IA julga pela fala, então clipe sem fala não é dela. Na gravação de 22/09 foram 59
+// de 131 — cenas e imagens de apoio em que o Whisper escreve "Obrigado.", "E aí" ou "Gravando" por cima
+// do quase-silêncio — e todos saíam "erro". Ficam SEM etiqueta, com o aviso pra conferir pela imagem.
+// Fala de verdade anda a ~2 palavras/s; abaixo de 0,6 (ou até 3 palavras) não é um take falado.
+// "Foi mal"/"de novo" sozinho continua erro: a pessoa declarou que errou.
+const MOTIVO_SEM_FALA = 'sem fala: confira pela imagem'
+function semFalaUtil(b) {
+  const s = (b.transc || '').trim()
+  const palavras = (s.match(/[\p{L}\p{N}]+/gu) || []).length
+  if (palavras >= 12) return false
+  if (fimRefaz.test(s.toLowerCase())) return false
+  const dur = b.durReal ?? b.seg ?? 0
+  return palavras <= 3 || !dur || palavras / dur < 0.6
+}
 const fimRefaz = /(de novo|foi mal|n[ãa]o ficou|vou gravar tudo|refazer|repetir|come[çc]ar de novo|corta(r)? essa|deixa eu refazer)/
 
 let gastos = 0 // tokens da Groq na classificação (a conta grátis tem teto por dia)
 let exemplos = []
 const resultados = [] // pro --avaliar
-let nClass = 0, nSil = 0, pendentes = 0, cotaAcabou = false
+let nClass = 0, pendentes = 0, cotaAcabou = false
 if (!SO_TRANSC) {
   for (let k = 0; k < sessoes.length; k++) sessoes[k] = marcarAngulos(sessoes[k])
+  let nSemFala = 0
+  for (const b of todos) {
+    if (!precisaBase(b) || !semFalaUtil(b)) continue
+    b.semFala = true
+    b.feito = true
+    nSemFala++
+    if (!AVALIAR) await upsert({ drive_id: b.id, nome: b.nome, team: TEAM, ia_tipo: null, ia_confianca: null, sugestao_titulo: null,
+      ia_motivo: MOTIVO_SEM_FALA + ' (cena ou imagem de apoio)', ia_resumo: 'Sem fala — a IA só julga pela fala. Confira pela imagem se é cena ou imagem de apoio.',
+      atualizado_em: new Date().toISOString() })
+  }
+  if (nSemFala) console.log(`${nSemFala} clipes sem fala útil: ficam sem etiqueta pra conferir pela imagem`)
   const nAng = todos.filter((b) => b.anguloDe).length
   if (nAng) console.log(`${nAng} clipes são o mesmo take em outro ângulo: herdam a classificação do take principal`)
   const alvosTodos = todos.filter(precisaClassif)
@@ -380,11 +406,6 @@ if (!SO_TRANSC) {
   sessao: for (const lista of sessoes) {
     const alvosIdx = lista.map((b, i) => (precisaClassif(b) ? i : -1)).filter((i) => i >= 0)
     if (!alvosIdx.length) continue
-    // silêncio não gasta IA: sem fala nenhuma é descarte
-    for (const i of alvosIdx) {
-      const b = lista[i]
-      if (b.transc === '') { await gravar(b, { motivo: 'sem fala no áudio', confianca: 0.9 }, 'erro'); nSil++ }
-    }
     const comFala = alvosIdx.filter((i) => lista[i].transc)
     // grupos de até 8 alvos, sem abrir janela maior que 14 clipes
     const grupos = []
@@ -466,7 +487,7 @@ if (!SO_TRANSC) {
     if (unidos) console.log(`ângulos unidos: ${unidos} takes gravados pelos dois celulares`)
   }
   console.log(`tokens gastos: ${gastos}`)
-  console.log(`classificados: ${nClass} · sem fala: ${nSil}${pendentes ? ` · pendentes: ${pendentes}` : ''}${cotaAcabou ? ' · parou na cota do dia' : ''}`)
+  console.log(`classificados: ${nClass}${pendentes ? ` · pendentes: ${pendentes}` : ''}${cotaAcabou ? ' · parou na cota do dia' : ''}`)
 }
 
 // ---- avaliação ----
