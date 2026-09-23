@@ -54,11 +54,11 @@ function numDoNome(nome) {
 const sessaoDe = (b) => (b.dia ? `${b.mes || '?'} · dia ${b.dia}` : b.pasta_id ? 'pasta ' + b.pasta_id : 'sem pasta')
 
 async function listarBrutos() {
-  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado,mes,dia,pasta_id,transcricao,ia_tipo,ia_motivo,tipo&team=eq.${TEAM}`))
+  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado,mes,dia,pasta_id,transcricao,ia_tipo,ia_motivo,tipo,atualizado_em&team=eq.${TEAM}`))
   const arr = (Array.isArray(rows) ? rows : []).map((b) => ({
     id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id,
     num: numDoNome(b.nome_original || b.nome), criado: b.criado || '', sessao: sessaoDe(b),
-    transcricao: b.transcricao, ia_tipo: b.ia_tipo, ia_motivo: b.ia_motivo, tipo: b.tipo,
+    transcricao: b.transcricao, ia_tipo: b.ia_tipo, ia_motivo: b.ia_motivo, tipo: b.tipo, atualizado: b.atualizado_em || '',
   }))
   const porSessao = new Map()
   for (const b of arr) { if (!porSessao.has(b.sessao)) porSessao.set(b.sessao, []); porSessao.get(b.sessao).push(b) }
@@ -279,7 +279,9 @@ await Promise.all(Array.from({ length: Math.min(CONC, filaT.length) }, trabalhad
 // ---- PASSA 2: classificação em janelas ----
 // Reparo: clipe classificado quando a transcrição tinha falhado ("transcrição vazia") e que hoje tem
 // fala. Ele virou "erro" e nunca mais foi olhado — era a maior fonte de descarte errado.
-const classificadoSemFala = (b) => b.ia_tipo && b.transc && /(transcri[çc][ãa]o vazia|sil[êe]ncio|sem [áa]udio|sem fala|clipe silencioso|nenhum conte[úu]do)/i.test(b.ia_motivo || '')
+// só o que foi classificado ANTES desta versão: o motivo novo de um bastidor ("sem fala útil") não pode
+// puxar o mesmo clipe de volta em toda rodada
+const classificadoSemFala = (b) => b.ia_tipo && b.transc && b.atualizado < '2026-09-22' && /(transcri[çc][ãa]o vazia|sil[êe]ncio|sem [áa]udio|sem fala|clipe silencioso|nenhum conte[úu]do)/i.test(b.ia_motivo || '')
 const precisaClassif = (b) => {
   if (b.falhou || b.transc == null) return false
   if (AVALIAR) return !!b.tipo
