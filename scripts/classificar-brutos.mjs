@@ -10,6 +10,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { spawn } from 'node:child_process'
+import crypto from 'node:crypto'
 
 const GROQ = process.env.GROQ_KEY
 const SECRET = process.env.SUPA_SECRET
@@ -23,6 +24,18 @@ const TEAM = process.env.TEAM || 'jaylton'
 const SO_SESSAO = (process.env.SO_SESSAO || '').split(',').map((x) => x.trim()).filter(Boolean) // ex.: "Agosto 2026 · dia 21"
 const MODELO = 'openai/gpt-oss-120b'
 const MODELO_LEVE = 'openai/gpt-oss-20b' // cota própria na Groq: o título não disputa com a classificação
+// TEMPOS=<arquivo> (saída de scripts/tempos-gravacao.mjs): horário REAL de gravação de cada clipe e o
+// celular que gravou. Com ele a gravação vira uma linha do tempo só, mesmo com dois celulares em pastas
+// separadas, e os clipes do mesmo momento em ângulos diferentes são reconhecidos como o mesmo take.
+const TEMPOS = process.env.TEMPOS ? JSON.parse(fs.readFileSync(process.env.TEMPOS, 'utf8')) : {}
+const TZ = 'America/Sao_Paulo'
+// LOCAL_DIRS=<pasta>,<pasta>: os vídeos já estão neste computador. Lê o áudio direto deles em vez de
+// baixar do Drive (10 GB a 2 MB/s levava mais de uma hora). SÓ LEITURA: nada é movido, renomeado
+// nem apagado nessas pastas.
+const LOCAL = new Map()
+for (const dir of (process.env.LOCAL_DIRS || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+  for (const nome of fs.readdirSync(dir)) if (/\.(mov|mp4|m4v)$/i.test(nome)) LOCAL.set(nome, path.join(dir, nome))
+}
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'classif-'))
 if (!GROQ || !SECRET) { console.error('faltou GROQ_KEY ou SUPA_SECRET'); process.exit(1) }
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -54,15 +67,21 @@ function numDoNome(nome) {
 const sessaoDe = (b) => (b.dia ? `${b.mes || '?'} · dia ${b.dia}` : b.pasta_id ? 'pasta ' + b.pasta_id : 'sem pasta')
 
 async function listarBrutos() {
-  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado,mes,dia,pasta_id,transcricao,ia_tipo,ia_motivo,tipo,atualizado_em&team=eq.${TEAM}`))
-  const arr = (Array.isArray(rows) ? rows : []).map((b) => ({
-    id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id,
-    num: numDoNome(b.nome_original || b.nome), criado: b.criado || '', sessao: sessaoDe(b),
+  const rows = await jsonOf(await sb(`brutos?select=drive_id,nome,nome_original,duracao,proxy_id,criado,mes,dia,pasta_id,transcricao,ia_tipo,ia_motivo,tipo,atualizado_em,grupo_id&team=eq.${TEAM}`))
+  const arr = (Array.isArray(rows) ? rows : []).map((b) => {
+    const tm = TEMPOS[b.drive_id]
+    const inicio = tm?.inicio ? Date.parse(tm.inicio) : null
+    return {
+    id: b.drive_id, nome: b.nome, seg: b.duracao, proxyId: b.proxy_id, grupo: b.grupo_id || null,
+    inicio, durReal: tm?.dur ?? null, cam: tm?.modelo || tm?.pasta || null,
+    num: numDoNome(b.nome_original || b.nome), criado: b.criado || '',
+    // com horário real, a gravação é o DIA em que foi filmada (as duas pastas dos dois celulares juntas)
+    sessao: inicio != null ? 'gravação de ' + new Date(inicio).toLocaleDateString('pt-BR', { timeZone: TZ }) : sessaoDe(b),
     transcricao: b.transcricao, ia_tipo: b.ia_tipo, ia_motivo: b.ia_motivo, tipo: b.tipo, atualizado: b.atualizado_em || '',
-  }))
+  }})
   const porSessao = new Map()
   for (const b of arr) { if (!porSessao.has(b.sessao)) porSessao.set(b.sessao, []); porSessao.get(b.sessao).push(b) }
-  for (const l of porSessao.values()) l.sort((a, b) => (a.num - b.num) || a.criado.localeCompare(b.criado))
+  for (const l of porSessao.values()) l.sort((a, b) => (a.inicio != null && b.inicio != null ? a.inicio - b.inicio : 0) || (a.num - b.num) || a.criado.localeCompare(b.criado))
   let sessoes = [...porSessao.values()]
   if (SO_SESSAO.length) sessoes = sessoes.filter((l) => SO_SESSAO.includes(l[0].sessao))
   return { todos: sessoes.flat(), sessoes }
@@ -102,8 +121,9 @@ async function esperarOuDesistir(r, tent, rotulo, teto = 90) {
 }
 
 async function transcrever(file) {
-  // extrai SÓ o áudio (16kHz mono, ~1MB) — vídeo grande passa do limite de 25MB do Whisper
-  const audio = file + '.m4a'
+  // extrai SÓ o áudio (16kHz mono, ~1MB) — vídeo grande passa do limite de 25MB do Whisper.
+  // O áudio vai pra pasta temporária: o arquivo pode ser a mídia original da pessoa (LOCAL_DIRS).
+  const audio = path.join(TMP, path.basename(file) + '.m4a')
   await new Promise((res, rej) => {
     const p = spawn('ffmpeg', ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '64k', audio], { stdio: ['ignore', 'ignore', 'ignore'] })
     p.on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg audio ' + c))))
@@ -145,6 +165,37 @@ async function groq(body, rotulo) {
     if (!r.ok) throw new Error(rotulo + ' ' + r.status + ' ' + JSON.stringify(d).slice(0, 160))
     return d
   }
+}
+
+// ---------- linha do tempo ----------
+const fimDe = (b) => b.inicio + (b.durReal ?? b.seg ?? 0) * 1000
+const horaDe = (b) => (b.inicio != null ? new Date(b.inicio).toLocaleTimeString('pt-BR', { timeZone: TZ }) : null)
+// segundos parados entre o fim do clipe anterior e o começo deste (null sem horário)
+const pausaEntre = (a, b) => (a && b && a.inicio != null && b.inicio != null ? Math.max(0, Math.round((b.inicio - fimDe(a)) / 1000)) : null)
+const fmtPausa = (s) => (s < 90 ? `${s}s` : `${Math.round(s / 60)} min`)
+// Dois celulares filmando ao mesmo tempo: o clipe do celular secundário que cobre o mesmo intervalo de
+// um clipe do principal (metade do menor, pelo menos) é o MESMO take em outro ângulo. Ele sai da
+// sequência que a IA lê (duas falas idênticas no mesmo horário pareceriam regravação) e herda a
+// classificação do take principal. Sem fala no principal e com fala no outro, não casa: segue sozinho.
+function marcarAngulos(lista) {
+  const cams = new Map()
+  for (const b of lista) if (b.inicio != null && b.cam) cams.set(b.cam, (cams.get(b.cam) || 0) + 1)
+  if (cams.size < 2) return lista
+  const principal = [...cams.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  const princ = lista.filter((b) => b.cam === principal && b.inicio != null)
+  for (const x of lista) {
+    if (x.cam === principal || x.inicio == null) continue
+    let melhor = null, sob = 0
+    for (const y of princ) {
+      const s = Math.min(fimDe(x), fimDe(y)) - Math.max(x.inicio, y.inicio)
+      if (s > sob) { sob = s; melhor = y }
+    }
+    if (!melhor || sob < 0.5 * Math.min(fimDe(x) - x.inicio, fimDe(melhor) - melhor.inicio)) continue
+    if (!melhor.transc && x.transc) continue
+    x.anguloDe = melhor
+    ;(melhor.angulos ||= []).push(x)
+  }
+  return lista.filter((b) => !b.anguloDe)
 }
 
 // ---------- o que a IA lê ----------
@@ -198,16 +249,22 @@ async function exemplosDificeis(excluir) {
 
 // Classifica os marcados de uma janela (clipes vizinhos da mesma gravação). Devolve Map n → resposta.
 async function classificarJanela(janela, alvos, exemplos, rotuloSessao) {
+  const comHora = janela.some((b) => b.inicio != null)
   const linhas = janela.map((b, i) => {
     const n = i + 1
     const marca = alvos.has(b) ? 'CLASSIFICAR' : (!AVALIAR && b.tipo ? `contexto [humano: ${b.tipo}]` : 'contexto')
     const [ini, fim] = alvos.has(b) ? [420, 260] : [200, 140]
-    return `#${n} · ${durDe(b)} · ${marca}: ${falaDe(b, ini, fim)}`
+    const p = pausaEntre(janela[i - 1], b)
+    const quando = horaDe(b) ? ` · ${horaDe(b)}${p != null ? ` · pausa ${fmtPausa(p)}` : ''}` : ''
+    return `#${n}${quando} · ${durDe(b)} · ${marca}: ${falaDe(b, ini, fim)}`
   })
+  const regraHora = comHora
+    ? '\n10. Cada clipe traz a hora em que foi gravado e a pausa desde o anterior. Takes do mesmo vídeo vêm um atrás do outro com pausa curta; pausa de vários minutos costuma separar um vídeo do próximo. Takes seguidos da mesma fala são regravação (regra 5).'
+    : ''
   const ex = exemplos.length
     ? '\n\nExemplos conferidos por uma pessoa (a IA tinha errado estes):\n' + exemplos.map((e) => `${e.duracao ?? '?'}s "${pontas(e.transcricao, 150, 110)}" => ${e.tipo}`).join('\n')
     : ''
-  const sys = `Você classifica os brutos (tomadas de câmera) de um professor e advogado que grava vídeos curtos pra redes sociais: conteúdo, anúncios, ganchos e bastidores. A sequência vem na ordem de gravação, toda do mesmo dia. Cada clipe mostra a duração e o COMEÇO e o FIM da fala (o meio pode vir omitido com […]).\n\n${REGRAS}${ex}\n\nClassifique SÓ os clipes marcados CLASSIFICAR (os de contexto servem pra comparar). Responda só JSON: {"clipes":[{"n":<número do clipe>,"tipo":"boa|gancho|complemento|erro","confianca":<0 a 1>,"motivo":"curto, citando o trecho que decidiu","tema":"...","tags":["..."],"resumo":"1 frase","titulo":"..."}]}. ${APELIDO}`
+  const sys = `Você classifica os brutos (tomadas de câmera) de um professor e advogado que grava vídeos curtos pra redes sociais: conteúdo, anúncios, ganchos e bastidores. A sequência vem na ordem de gravação, toda do mesmo dia. Cada clipe mostra a duração e o COMEÇO e o FIM da fala (o meio pode vir omitido com […]).\n\n${REGRAS}${regraHora}${ex}\n\nClassifique SÓ os clipes marcados CLASSIFICAR (os de contexto servem pra comparar). Responda só JSON: {"clipes":[{"n":<número do clipe>,"tipo":"boa|gancho|complemento|erro","confianca":<0 a 1>,"motivo":"curto, citando o trecho que decidiu","tema":"...","tags":["..."],"resumo":"1 frase","titulo":"..."}]}. ${APELIDO}`
   const user = `Gravação: ${rotuloSessao}\n\n${linhas.join('\n')}`
   const d = await groq({ model: MODELO, temperature: 0.1, reasoning_effort: 'medium', max_completion_tokens: 1500 + alvos.size * 200, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }, 'ia')
   gastos += d.usage?.total_tokens || 0
@@ -249,7 +306,7 @@ for (const b of todos) b.transc = b.transcricao ?? null
 // volta pra fila (antes os mesmos 12 clipes mudos eram baixados e mandados pro Whisper a cada rodada).
 const precisaTransc = (b) => FORCE || b.transcricao == null || (b.transcricao === '' && !b.ia_tipo)
 const filaT = AVALIAR ? [] : todos.filter(precisaTransc)
-console.log(`${todos.length} brutos em ${sessoes.length} gravações · ${filaT.length} pra transcrever`)
+console.log(`${todos.length} brutos em ${sessoes.length} gravações · ${filaT.length} pra transcrever${LOCAL.size ? ` (${filaT.filter((b) => LOCAL.has(b.nome)).length} direto dos arquivos deste computador)` : ''}`)
 const CONC = Number(process.env.CONC || 4)
 let cursor = 0
 let whisperParou = false
@@ -258,10 +315,11 @@ async function trabalhador() {
     const b = filaT[cursor++]
     if (!b) return
     if (whisperParou) { b.falhou = true; continue }
+    const local = LOCAL.get(b.nome)
     const tmp = path.join(TMP, b.id + '.mp4')
     try {
-      await baixar(b.proxyId || b.id, tmp) // sem proxy ainda: tira o áudio do original
-      b.transc = await transcrever(tmp)
+      if (!local) await baixar(b.proxyId || b.id, tmp) // sem proxy ainda: tira o áudio do original
+      b.transc = await transcrever(local || tmp)
       b.novaTransc = true
       await upsert({ drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: b.transc, team: TEAM, atualizado_em: new Date().toISOString() })
       // o registro do GitHub é público: nome e tamanho, nunca o que a pessoa fala
@@ -271,7 +329,7 @@ async function trabalhador() {
       b.falhou = true
       if (e instanceof CotaEsgotada) whisperParou = true
       console.log(`• ${b.nome} NÃO transcreveu (${e.message}) — fica pra próxima rodada`)
-    } finally { fs.rmSync(tmp, { force: true }) }
+    } finally { if (!local) fs.rmSync(tmp, { force: true }) } // o arquivo local é da pessoa: nunca apagar
   }
 }
 await Promise.all(Array.from({ length: Math.min(CONC, filaT.length) }, trabalhador))
@@ -282,12 +340,13 @@ await Promise.all(Array.from({ length: Math.min(CONC, filaT.length) }, trabalhad
 // só o que foi classificado ANTES desta versão: o motivo novo de um bastidor ("sem fala útil") não pode
 // puxar o mesmo clipe de volta em toda rodada
 const classificadoSemFala = (b) => b.ia_tipo && b.transc && b.atualizado < '2026-09-22' && /(transcri[çc][ãa]o vazia|sil[êe]ncio|sem [áa]udio|sem fala|clipe silencioso|nenhum conte[úu]do)/i.test(b.ia_motivo || '')
-const precisaClassif = (b) => {
+const precisaBase = (b) => {
   if (b.falhou || b.transc == null) return false
   if (AVALIAR) return !!b.tipo
   if (FORCE || RECLASS || b.novaTransc || !b.ia_tipo) return true
   return !b.tipo && classificadoSemFala(b)
 }
+const precisaClassif = (b) => !b.anguloDe && precisaBase(b)
 const fimRefaz = /(de novo|foi mal|n[ãa]o ficou|vou gravar tudo|refazer|repetir|come[çc]ar de novo|corta(r)? essa|deixa eu refazer)/
 
 let gastos = 0 // tokens da Groq na classificação (a conta grátis tem teto por dia)
@@ -295,12 +354,19 @@ let exemplos = []
 const resultados = [] // pro --avaliar
 let nClass = 0, nSil = 0, pendentes = 0, cotaAcabou = false
 if (!SO_TRANSC) {
+  for (let k = 0; k < sessoes.length; k++) sessoes[k] = marcarAngulos(sessoes[k])
+  const nAng = todos.filter((b) => b.anguloDe).length
+  if (nAng) console.log(`${nAng} clipes são o mesmo take em outro ângulo: herdam a classificação do take principal`)
   const alvosTodos = todos.filter(precisaClassif)
   console.log(`--- classificação: ${alvosTodos.length} clipes ---`)
   exemplos = await exemplosDificeis(new Set(AVALIAR ? todos.filter((b) => b.tipo).map((b) => b.id) : []))
   if (AVALIAR) exemplos = [] // na avaliação os difíceis SÃO a prova; não dá pra mostrar a resposta
 
   const gravar = async (b, c, tipoFinal) => {
+    b.feito = true
+    for (const x of b.angulos || []) {
+      if (!x.feito && precisaBase(x)) await gravar(x, { ...c, confianca: c.confianca, motivo: `mesmo take que ${b.nome}, outro ângulo` + (c.motivo ? ' — ' + c.motivo : '') }, tipoFinal)
+    }
     if (AVALIAR) { resultados.push({ b, tipo: tipoFinal, c }); return }
     await upsert({
       drive_id: b.id, nome: b.nome, duracao: b.seg, transcricao: b.transc, team: TEAM,
@@ -322,9 +388,11 @@ if (!SO_TRANSC) {
     const comFala = alvosIdx.filter((i) => lista[i].transc)
     // grupos de até 8 alvos, sem abrir janela maior que 14 clipes
     const grupos = []
+    // pausa de mais de 3 min entre dois clipes = provavelmente outro vídeo: a janela não atravessa
+    const pausaLonga = (de, ate) => { for (let k = de + 1; k <= ate; k++) if ((pausaEntre(lista[k - 1], lista[k]) ?? 0) > 180) return true; return false }
     for (const i of comFala) {
       const g = grupos[grupos.length - 1]
-      if (g && g.length < 8 && i - g[0] <= 11) g.push(i)
+      if (g && g.length < 8 && i - g[0] <= 11 && !pausaLonga(g[g.length - 1], i)) g.push(i)
       else grupos.push([i])
     }
     // Uma janela que falha (JSON quebrado da Groq, resposta cortada) é dividida ao meio e tentada de
@@ -376,6 +444,26 @@ if (!SO_TRANSC) {
         throw e
       }
     }
+  }
+  // take principal que já estava classificado de rodadas anteriores: o ângulo novo herda o tipo dele
+  if (!cotaAcabou) for (const b of todos) {
+    const y = b.anguloDe
+    if (!y || b.feito || !precisaBase(b) || !(y.tipo || y.ia_tipo)) continue
+    await gravar(b, { motivo: `mesmo take que ${y.nome}, outro ângulo`, confianca: 0.9 }, y.tipo || y.ia_tipo)
+  }
+  // Os ângulos do mesmo take andam juntos no Catálogo (o mesmo "unir" do botão): ligou um ao card,
+  // o outro vai junto. Grupo que a pessoa já montou é respeitado — o ângulo entra nele.
+  if (!AVALIAR && !cotaAcabou) {
+    let unidos = 0
+    for (const y of todos) {
+      if (!y.angulos?.length) continue
+      const membros = [y, ...y.angulos]
+      if (membros.every((m) => m.grupo && m.grupo === y.grupo)) continue
+      const g = membros.map((m) => m.grupo).find(Boolean) || crypto.randomUUID()
+      const r = await sb(`brutos?drive_id=in.(${membros.map((m) => m.id).join(',')})`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ grupo_id: g }) })
+      if (r.ok) { unidos++; for (const m of membros) m.grupo = g }
+    }
+    if (unidos) console.log(`ângulos unidos: ${unidos} takes gravados pelos dois celulares`)
   }
   console.log(`tokens gastos: ${gastos}`)
   console.log(`classificados: ${nClass} · sem fala: ${nSil}${pendentes ? ` · pendentes: ${pendentes}` : ''}${cotaAcabou ? ' · parou na cota do dia' : ''}`)

@@ -38,7 +38,11 @@ function extrairFrame(url, token, jpg, ss) {
   })
 }
 
+// CAPA_DRIVE=1: rodando fora do GitHub (sem a chave do servidor do Supabase, o armazenamento recusa
+// a imagem). A capa passa a ser a miniatura do próprio Drive, servida pela rota /api/thumb do site.
+const CAPA_DRIVE = process.env.CAPA_DRIVE === '1'
 async function gerarCapa(id) {
+  if (CAPA_DRIVE) return `https://audiovisual.alascasa.com.br/api/thumb?id=${encodeURIComponent(id)}`
   const token = await driveToken()
   const url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`
   const jpg = path.join(TMP, id + '.jpg')

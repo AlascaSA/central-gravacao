@@ -63,7 +63,9 @@ export async function listarVideos(token, raizes = BRUTOS_ROOTS) {
           let iMes = MESES.findIndex((m) => new RegExp('^' + m + '\\b', 'i').test(nome))
           if (iMes < 0) iMes = MESES_ABREV.findIndex((a) => new RegExp('^' + a + '\\b', 'i').test(nome)) // "JUL" → Julho
           if (iMes >= 0) mes = MESES[iMes]
-          else if (/^\d{1,2}$/.test(nome) || /^dia\s*\d/i.test(nome)) dia = nome.replace(/^dia\s*/i, '').padStart(2, '0')
+          // pasta numérica DENTRO de um dia não é outro dia: em "Setembro / 22 / 01" e "22 / 02" o 01 e o
+          // 02 eram os dois celulares da gravação do dia 22, e o 01 sobrescrevia o 22. Vira bloco.
+          else if (!dia && (/^\d{1,2}$/.test(nome) || /^dia\s*\d/i.test(nome))) dia = nome.replace(/^dia\s*/i, '').padStart(2, '0')
           // primeira pasta que não é mês, dia nem ano vira o bloco. O ano (2026) fica de fora senão
           // ele viraria "bloco" na varredura completa; e a escopada começa DENTRO do dia, onde
           // `dia` ainda é nulo — por isso a regra não pode depender de o dia já estar marcado.
