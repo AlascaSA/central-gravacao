@@ -1062,7 +1062,7 @@ export default function Catalogo() {
       {/* Enquanto arrasta: todos os vídeos do dia num lugar só, pra soltar sem precisar rolar a página,
           e o "novo vídeo" pra criar um na hora com os takes arrastados. */}
       {arrastando && divDoDia && (
-        <div className="glass fixed bottom-0 left-0 right-0 z-50 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border/70">
+        <div className="bg-elev fixed bottom-0 left-0 right-0 z-50 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+14px)] border-t border-border-strong shadow-[0_-20px_50px_-10px_rgba(0,0,0,0.7)]">
           <div className="max-w-5xl mx-auto">
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-muted mb-2">Soltar {arrastando.length > 1 ? `os ${arrastando.length} takes` : 'o take'} em</div>
             <div className="flex flex-wrap gap-2">
