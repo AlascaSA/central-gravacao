@@ -529,16 +529,12 @@ export default function Catalogo() {
   const videosDoDia = useMemo(() => {
     if (!diaAtual) return []
     if (!divDoDia) return diaAtual.videos
-    // seções na ordem do take mais antigo de cada vídeo: vídeo criado ou remontado à mão cai no lugar
-    // certo da gravação, sem depender do número do nome
+    // seções na ordem do NÚMERO do vídeo (Vídeo 01, 02, 03…; "Imagens de apoio" vêm depois). Ordenar pelo
+    // take mais antigo punha o Vídeo 05 logo depois do 01 só porque recebeu uma imagem de apoio gravada
+    // de manhã. Vídeo novo criado à mão entra no fim.
     const quando = (v: Bruto) => classif[v.id]?.gravado_em || v.criado || ''
-    const inicioDiv = new Map<string, string>()
-    for (const v of diaAtual.videos) {
-      const d = classif[v.id]?.divisao_id || ''
-      const q = quando(v)
-      if (!inicioDiv.has(d) || q < inicioDiv.get(d)!) inicioDiv.set(d, q)
-    }
-    const chave = (v: Bruto) => { const d = classif[v.id]?.divisao_id || ''; return d ? inicioDiv.get(d)! + '|' + d : '~' }
+    const ordemDiv = (d: string) => divDoDia.porId.get(d)?.ordem ?? 9999
+    const chave = (v: Bruto) => { const d = classif[v.id]?.divisao_id || ''; return d ? String(ordemDiv(d)).padStart(5, '0') + '|' + d : '~' }
     return [...diaAtual.videos].sort((a, b) => chave(a).localeCompare(chave(b)) || quando(a).localeCompare(quando(b)))
   }, [diaAtual, divDoDia, classif])
   const videosVisiveis = filtrando ? filtrados : videosDoDia

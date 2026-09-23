@@ -26,8 +26,6 @@ const TEAM = process.env.TEAM || 'jaylton'
 const SO_SESSAO = (process.env.SO_SESSAO || '').split(',').map((x) => x.trim()).filter(Boolean) // ex.: "Agosto 2026 · dia 21"
 const MODELO = 'openai/gpt-oss-120b'
 const MODELO_LEVE = 'openai/gpt-oss-20b' // cota própria na Groq: o título não disputa com a classificação
-const MODELO_VISAO = 'qwen/qwen3.8-27b' // o único da Groq que lê imagem (teto de 1 mil tokens de saída por minuto)
-const SITE = 'https://audiovisual.alascasa.com.br'
 const TZ = 'America/Sao_Paulo'
 const DIVIDIR = (process.env.DIVIDIR || '').split(',').map((x) => x.trim()).filter(Boolean)
 const NO_GITHUB = !!process.env.GITHUB_ACTIONS // registro público: nada de conteúdo da fala nele
@@ -293,74 +291,10 @@ async function classificarJanela(janela, alvos, exemplos, rotuloSessao) {
 }
 
 // ---------- divisão em vídeos ----------
-// Uma gravação de um dia inteiro tem vários vídeos do projeto (roteiros, cenas). A IA lê a sequência
-// com hora e pausa e diz onde cada vídeo COMEÇA — pedir só o começo garante divisões sem buraco nem
-// sobreposição. Clipe sem fala (cena, imagem de apoio) fica no vídeo ao lado do qual foi gravado.
-async function segmentar(bloco) {
-  const linhas = bloco.map((b, i) => {
-    const p = pausaEntre(bloco[i - 1], b)
-    return `#${i + 1} · ${horaDe(b) || '?'}${p != null ? ` · pausa ${fmtPausa(p)}` : ''} · ${durDe(b)}: ${b.semFala || !b.transc ? '(sem fala)' : falaDe(b, 110, 60)}`
-  })
-  const sys = 'Você organiza os brutos de uma gravação de vídeos curtos pra redes sociais (um professor e advogado; às vezes cenas com outras pessoas). ' +
-    'Os clipes vêm na ordem em que foram gravados, com a hora, a pausa desde o anterior, a duração e o começo e o fim da fala.\n\n' +
-    'Separe a sequência em VÍDEOS do projeto — poucos e grandes. Um vídeo é um roteiro ou uma cena inteira, com todos os seus takes. Ficam no MESMO vídeo: os takes e regravações da mesma fala, ' +
-    'as partes do mesmo roteiro gravadas em sequência (abertura, desenvolvimento, chamada final), a cena encenada com várias pessoas e a fala que responde a ela, ' +
-    'e os clipes sem fala, de bastidor ou de ajuste (cenas, imagens de apoio, "gravando", "obrigado") gravados junto.\n' +
-    'Só começa um vídeo NOVO quando começa um roteiro diferente: outra frase de abertura, outro assunto. Clipe sem fala ou de bastidor NUNCA abre um vídeo — ele fica no vídeo ao lado. ' +
-    'Nunca quebre no meio de uma cadeia de regravações da mesma fala. Na dúvida, não divida.\n\n' +
-    'Responda só JSON: {"videos":[{"comeca_em":<número do primeiro clipe do vídeo>,"tema":"2 a 5 palavras"}]}, em ordem, o primeiro começando em 1.'
-  const d = await groq({ model: MODELO, temperature: 0.1, reasoning_effort: 'medium', max_completion_tokens: 2500, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: linhas.join('\n') }] }, 'divisão')
-  gastos += d.usage?.total_tokens || 0
-  const out = JSON.parse(d.choices?.[0]?.message?.content || '{}')
-  const inicios = new Map([[1, '']])
-  for (const v of Array.isArray(out.videos) ? out.videos : []) {
-    const n = Math.round(Number(v.comeca_em))
-    if (n >= 1 && n <= bloco.length) inicios.set(n, String(v.tema || '').slice(0, 60))
-  }
-  // A IA divide por conteúdo, mas só pode abrir vídeo novo depois de uma pausa de 5 min ou mais.
-  // Na gravação de 22/09 ela cortou o esquete do cardápio em 4 com pausas de 0,9 a 1,5 min entre os
-  // takes — os cortes certos caíam todos em pausas de 7 min a 3 h.
-  const PAUSA_MIN = 300
-  for (const n of [...inicios.keys()]) if (n > 1 && (pausaEntre(bloco[n - 2], bloco[n - 1]) ?? Infinity) < PAUSA_MIN) inicios.delete(n)
-  const cortes = [...inicios.keys()].sort((a, b) => a - b)
-  return cortes.map((c, i) => ({ clipes: bloco.slice(c - 1, (cortes[i + 1] || bloco.length + 1) - 1), tema: inicios.get(c) }))
-}
-
-// Clipe sem fala: a IA de texto não sabe o que é. O modelo de visão descreve a miniatura ("close do
-// cardápio", "gavetas do escritório") e a descrição fica salva no clipe (aparece no player).
-async function legendar(b) {
-  const d = await groq({
-    model: MODELO_VISAO, temperature: 0.2, max_tokens: 60,
-    messages: [{ role: 'user', content: [
-      { type: 'text', text: 'Descreva o que aparece nesta imagem em até 12 palavras, em português: quem, o quê, onde. Sem introdução.' },
-      { type: 'image_url', image_url: { url: `${SITE}/api/thumb?id=${encodeURIComponent(b.id)}` } },
-    ] }],
-  }, 'visão')
-  return String(d.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\s+/g, ' ').trim().slice(0, 140)
-}
-
-// Imagem de apoio não é gravada junto do vídeo dela: vem em lote, antes ou depois. A IA casa cada clipe
-// sem fala com o vídeo do ASSUNTO da imagem; o que não casa com nenhum vai pra "Imagens de apoio".
-async function atribuirImagens(videos, mudos) {
-  const faixa = (v) => `${horaDe(v.clipes[0]) || '?'}–${horaDe(v.clipes[v.clipes.length - 1]) || '?'}`
-  const abre = (v) => { const f = v.clipes.find((b) => b.transc && !b.semFala); return f ? pontas(f.transc, 90, 0) : '' }
-  const linhasV = videos.map((v, i) => `V${i + 1} · ${faixa(v)}${v.tema ? ` · ${v.tema}` : ''} · começa: "${abre(v)}"`)
-  const linhasM = mudos.map((b, i) => `#${i + 1} · ${horaDe(b) || '?'} · ${durDe(b)} · imagem: ${b.legenda || '(sem descrição)'}`)
-  const sys = 'Você recebe os VÍDEOS de uma gravação (horário, assunto e a fala de abertura de cada um) e os clipes SEM FALA (imagens de apoio e cenas), cada um com o horário e a descrição da imagem. ' +
-    'Diga a qual vídeo cada clipe sem fala pertence: primeiro pelo ASSUNTO da imagem (um close do cardápio vai no vídeo do cardápio; alguém mexendo no celular vai no vídeo que fala disso) e, em segundo lugar, pela proximidade de horário (cena gravada logo antes ou logo depois de um vídeo costuma ser dele). ' +
-    'Se a imagem não tem ligação clara com nenhum vídeo, responda 0. Responda só JSON: {"clipes":[{"n":<número do clipe>,"video":<número do vídeo, sem o V, ou 0>}]}'
-  const d = await groq({ model: MODELO, temperature: 0.1, reasoning_effort: 'medium', max_completion_tokens: 3000, response_format: { type: 'json_object' },
-    messages: [{ role: 'system', content: sys }, { role: 'user', content: `VÍDEOS:\n${linhasV.join('\n')}\n\nCLIPES SEM FALA:\n${linhasM.join('\n')}` }] }, 'imagens')
-  gastos += d.usage?.total_tokens || 0
-  const out = JSON.parse(d.choices?.[0]?.message?.content || '{}')
-  const mapa = new Map()
-  for (const c of Array.isArray(out.clipes) ? out.clipes : []) {
-    const b = mudos[Number(c.n) - 1]
-    const v = Math.round(Number(c.video))
-    if (b && v >= 1 && v <= videos.length) mapa.set(b, v - 1)
-  }
-  return mapa
-}
+// SÓ PELO HORÁRIO: pausa de mais de 5 min entre o fim de um clipe e o começo do próximo = outro vídeo.
+// A IA dividindo por conteúdo errava (partia esquete em 4, jogava cena da manhã no vídeo da tarde);
+// com 2-3 min o vídeo das caixas de 22/09 se partia — os takes dele têm pausas de até 4 min.
+const PAUSA_VIDEO = 300
 
 // apelido curto só pra nomear — backfill de sugestao_titulo dos "boa" que ficaram sem
 async function tituloCurto(transc) {
@@ -456,7 +390,7 @@ const precisaBase = (b) => {
 }
 const precisaClassif = (b) => !b.anguloDe && !b.semFala && precisaBase(b)
 // SEM FALA ÚTIL: a IA julga pela fala, então clipe sem fala não é dela. Na gravação de 22/09 foram 59
-// de 131 — cenas e imagens de apoio em que o Whisper escreve "Obrigado.", "E aí" ou "Gravando" por cima
+// de 131 — cenas sem fala dos vídeos, em que o Whisper escreve "Obrigado.", "E aí" ou "Gravando" por cima
 // do quase-silêncio — e todos saíam "erro". Ficam SEM etiqueta, com o aviso pra conferir pela imagem.
 // Fala de verdade anda a ~2 palavras/s; abaixo de 0,6 (ou até 3 palavras) não é um take falado.
 // "Foi mal"/"de novo" sozinho continua erro: a pessoa declarou que errou.
@@ -484,7 +418,7 @@ if (!SO_TRANSC) {
     b.ia_tipo = null
     nSemFala++
     if (!AVALIAR) await upsert({ drive_id: b.id, nome: b.nome, team: TEAM, ia_tipo: null, ia_confianca: null, sugestao_titulo: null,
-      ia_motivo: MOTIVO_SEM_FALA + ' (cena ou imagem de apoio)', ia_resumo: 'Sem fala — a IA só julga pela fala. Confira pela imagem se é cena ou imagem de apoio.',
+      ia_motivo: MOTIVO_SEM_FALA + ' (cena sem fala)', ia_resumo: 'Sem fala — cena do vídeo. A IA só julga pela fala; confira pela imagem.',
       atualizado_em: new Date().toISOString() })
   }
   if (nSemFala) console.log(`${nSemFala} clipes sem fala útil: ficam sem etiqueta pra conferir pela imagem`)
@@ -499,77 +433,19 @@ if (!SO_TRANSC) {
     divisao: for (const lista of sessoes) {
       const todosSoltos = lista.filter((b) => !b.divisao)
       if (!todosSoltos.length || !lista.some((b) => b.novo || forcado(b))) continue
-      // O que tem fala divide os vídeos; o que não tem fala (imagem de apoio, cena) é casado depois
-      // pelo que aparece na imagem. Misturar os dois fazia a imagem de apoio "abrir" vídeo ou cair
-      // jogada dentro do vídeo errado só por ter sido gravada perto.
-      const palavrasDe = (b) => (b.transc || '').split(/\s+/).filter(Boolean).length
-      const ehMudo = (b) => b.semFala || !b.transc
-      const soltos = todosSoltos.filter((b) => !ehMudo(b))
-      const mudos = todosSoltos.filter(ehMudo)
-      // blocos separados por pausa de 20+ min; cada bloco a IA divide por conteúdo
-      const blocos = [[]]
-      for (const b of soltos) {
-        const ult = blocos[blocos.length - 1]
-        if (ult.length && (pausaEntre(ult[ult.length - 1], b) ?? 0) > 1200) blocos.push([b])
-        else ult.push(b)
-      }
-      // vídeo sem nenhuma fala de verdade (só cena, imagem de apoio, "gravando") não fica sozinho:
-      // junta ao vídeo anterior do mesmo bloco (ou ao seguinte, se for o primeiro)
-      const palavras = (b) => (b.transc || '').split(/\s+/).filter(Boolean).length
-      const temFala = (pt) => pt.clipes.some((b) => !b.semFala && palavras(b) >= 12)
-      const juntarSemFala = (ps) => {
-        const out = []
-        for (const pt of ps) {
-          if (!temFala(pt) && out.length) { out[out.length - 1].clipes.push(...pt.clipes); continue }
-          out.push({ ...pt, clipes: [...pt.clipes] })
-        }
-        if (out.length > 1 && !temFala(out[0])) { out[1].clipes.unshift(...out[0].clipes); out[1].tema = out[1].tema || out[0].tema; out.shift() }
-        return out
-      }
+      // uma sequência só (os dois celulares juntos), cortada onde houver pausa de mais de 5 min
       const partes = []
-      for (const bl of blocos) {
-        if (!bl.length) continue
-        const comFala = bl.filter((b) => palavrasDe(b) >= 12).length
-        if (bl.length <= 2 || comFala === 0) { partes.push({ clipes: bl, tema: '' }); continue }
-        try { partes.push(...juntarSemFala(await segmentar(bl))) } catch (e) {
-          if (e instanceof CotaEsgotada) { cotaAcabou = true; console.log(`\n${e.message} — a divisão fica pra próxima rodada`); break divisao }
-          console.log(`(divisão por conteúdo falhou: ${e.message.slice(0, 80)} — o bloco vira um vídeo só)`)
-          partes.push({ clipes: bl, tema: '' })
-        }
-      }
-      // imagens de apoio: descreve as que ainda não têm descrição e casa com o vídeo do assunto
-      let parouVisao = false
-      for (const b of mudos) {
-        if (b.legenda || parouVisao) continue
-        try {
-          b.legenda = await legendar(b)
-          if (b.legenda) await upsert({ drive_id: b.id, team: TEAM, ia_resumo: 'Imagem: ' + b.legenda })
-        } catch (e) { if (e instanceof CotaEsgotada) parouVisao = true }
-      }
-      const semVideo = []
-      if (mudos.length && partes.length) {
-        let mapa = new Map()
-        try { mapa = await atribuirImagens(partes, mudos) } catch (e) {
-          if (e instanceof CotaEsgotada) { cotaAcabou = true; console.log(`\n${e.message} — a divisão fica pra próxima rodada`); break divisao }
-          console.log(`(casar imagens falhou: ${e.message.slice(0, 80)} — ficam em Imagens de apoio)`)
-        }
-        for (const b of mudos) { const v = mapa.get(b); if (v != null) partes[v].clipes.push(b); else semVideo.push(b) }
-      } else semVideo.push(...mudos)
-      for (const pt of partes) pt.clipes.sort((a, b) => (a.inicio ?? 0) - (b.inicio ?? 0))
-      // o que não casou com nenhum vídeo: "Imagens de apoio", um bloco por sessão de gravação (pausa de 10+ min separa)
-      const apoios = []
-      for (const b of semVideo.sort((a, b) => (a.inicio ?? 0) - (b.inicio ?? 0))) {
-        const ult = apoios[apoios.length - 1]
-        if (ult && (pausaEntre(ult.clipes[ult.clipes.length - 1], b) ?? 0) <= 600) ult.clipes.push(b)
-        else apoios.push({ clipes: [b], tema: 'imagens de apoio', apoio: true })
+      let fimAte = null
+      for (const b of todosSoltos) {
+        const fimB = b.inicio != null ? fimDe(b) : null
+        if (!partes.length || (b.inicio != null && fimAte != null && (b.inicio - fimAte) / 1000 > PAUSA_VIDEO)) partes.push({ clipes: [], tema: '' })
+        partes[partes.length - 1].clipes.push(b)
+        if (fimB != null) fimAte = fimAte == null ? fimB : Math.max(fimAte, fimB)
       }
       // numera depois das divisões que o dia já tinha
       const ja = new Set(lista.map((b) => b.divisao).filter(Boolean)).size
-      const nomeApoio = (i) => (apoios.length > 1 ? `Imagens de apoio ${String(i + 1).padStart(2, '0')}` : 'Imagens de apoio')
-      apoios.forEach((ap, i) => { ap.nome = nomeApoio(i) })
-      partes.push(...apoios)
       const r = await sb('divisoes', { method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify(partes.map((pt, i) => ({ team: TEAM, nome: pt.nome || 'Vídeo ' + String(ja + i + 1).padStart(2, '0'), ordem: ja + i + 1 }))) })
+        body: JSON.stringify(partes.map((pt, i) => ({ team: TEAM, nome: 'Vídeo ' + String(ja + i + 1).padStart(2, '0'), ordem: ja + i + 1 }))) })
       const criadas = await jsonOf(r)
       if (!r.ok || !Array.isArray(criadas) || criadas.length !== partes.length) { console.log('✗ não consegui criar as divisões: ' + JSON.stringify(criadas).slice(0, 120)); continue }
       for (let i = 0; i < partes.length; i++) {
@@ -578,7 +454,7 @@ if (!SO_TRANSC) {
         for (const m of membros) m.divisao = id
         await sb(`brutos?drive_id=in.(${membros.map((m) => m.id).join(',')})`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ divisao_id: id }) })
         divNovas.set(id, membros)
-        console.log(`${criadas[i].nome}: ${membros.length} clipes${!NO_GITHUB && partes[i].tema ? ` (${partes[i].tema})` : ''}`)
+        console.log(`${criadas[i].nome}: ${membros.length} clipes · ${horaDe(partes[i].clipes[0]) || '?'}–${horaDe(partes[i].clipes[partes[i].clipes.length - 1]) || '?'}`)
       }
     }
   }
