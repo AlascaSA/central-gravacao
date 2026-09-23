@@ -296,6 +296,31 @@ async function classificarJanela(janela, alvos, exemplos, rotuloSessao) {
 // com 2-3 min o vídeo das caixas de 22/09 se partia — os takes dele têm pausas de até 4 min.
 const PAUSA_VIDEO = 300
 
+// VERSÕES DA MESMA FALA: o professor regrava a mesma parte com outras palavras ("Isso mesmo, a
+// assinatura vitalícia vai acabar…" três vezes). A classificação por janela deixava as três "boa" — e a
+// união juntava as três no card. Aqui a IA vê os takes bons do vídeo inteiro, agrupa as versões da
+// mesma fala e escolhe UMA por grupo; partes diferentes (abertura, corpo, chamada) ficam cada uma.
+async function escolherVersoes(bons) {
+  const linhas = bons.map((b, i) => `#${i + 1} · ${horaDe(b) || '?'} · ${durDe(b)}: ${falaDe(b, 260, 200)}`)
+  const sys = 'Você recebe os takes marcados como BONS de um mesmo vídeo, na ordem de gravação (hora, duração, começo e fim da fala). ' +
+    'Alguns são VERSÕES da mesma fala: o professor regravou a mesma parte do roteiro, com as mesmas ideias e palavras parecidas. ' +
+    'Agrupe as versões da mesma fala e escolha a melhor de cada grupo: a MAIS RECENTE que chega ao fim sem tropeço nem correção. ' +
+    'Partes DIFERENTES do roteiro (abertura, desenvolvimento, outro argumento, chamada final) NÃO são versões: cada uma fica no seu próprio grupo. ' +
+    'Responda só JSON: {"grupos":[{"versoes":[<números dos takes>],"melhor":<número>}]} cobrindo todos os takes.'
+  const d = await groq({ model: MODELO, temperature: 0.1, reasoning_effort: 'medium', max_completion_tokens: 2500, response_format: { type: 'json_object' },
+    messages: [{ role: 'system', content: sys }, { role: 'user', content: linhas.join('\n') }] }, 'versões')
+  gastos += d.usage?.total_tokens || 0
+  const out = JSON.parse(d.choices?.[0]?.message?.content || '{}')
+  const perdedores = new Map() // take → take escolhido no lugar dele
+  for (const g of Array.isArray(out.grupos) ? out.grupos : []) {
+    const vs = (Array.isArray(g.versoes) ? g.versoes : []).map((n) => bons[Number(n) - 1]).filter(Boolean)
+    const melhor = bons[Number(g.melhor) - 1]
+    if (vs.length < 2 || !melhor || !vs.includes(melhor)) continue
+    for (const v of vs) if (v !== melhor) perdedores.set(v, melhor)
+  }
+  return perdedores
+}
+
 // apelido curto só pra nomear — backfill de sugestao_titulo dos "boa" que ficaram sem
 async function tituloCurto(transc) {
   const d = await groq({
@@ -554,10 +579,42 @@ if (!SO_TRANSC) {
   // Em cada vídeo novo, a IA une os takes que considera bons (boa, gancho, complemento, com os ângulos
   // deles): ligou um ao card, os outros vão junto — a pessoa só confere. Erro e sem fala ficam soltos
   // dentro do vídeo. Antes a união era por ângulo, e um take ruim ficava grudado num bom.
+  // vídeos a fechar: os criados agora e os do dia pedido em DIVIDIR (rever um dia já dividido)
+  const aFechar = new Map(divNovas)
+  for (const b of todos) {
+    if (!b.divisao || !forcado(b) || aFechar.has(b.divisao)) continue
+    aFechar.set(b.divisao, todos.filter((x) => x.divisao === b.divisao))
+  }
+  const tipoDe = (m) => m.tipo || m.tipoNovo || m.ia_tipo // humano > o que a IA acabou de decidir > o antigo
+  const ehBom = (m) => ['boa', 'gancho', 'complemento'].includes(tipoDe(m))
+  if (!AVALIAR && !cotaAcabou) {
+    let versoes = 0
+    for (const membros of aFechar.values()) {
+      // só takes principais (o ângulo segue o dele) e só os que a IA marcou: o humano manda no que confirmou
+      const bons = membros.filter((m) => !m.anguloDe && ehBom(m)).sort((a, b) => (a.inicio ?? 0) - (b.inicio ?? 0))
+      if (bons.length < 2) continue
+      let perdedores
+      try { perdedores = await escolherVersoes(bons) } catch (e) {
+        if (e instanceof CotaEsgotada) { cotaAcabou = true; console.log(`\n${e.message}`); break }
+        console.log(`(escolha de versões falhou: ${e.message.slice(0, 80)})`); continue
+      }
+      for (const [v, melhor] of perdedores) {
+        if (v.tipo) continue
+        for (const m of [v, ...(v.angulos || [])]) {
+          if (m.tipo) continue
+          m.tipoNovo = 'erro'
+          await sb(`brutos?drive_id=eq.${encodeURIComponent(m.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ ia_tipo: 'erro', ia_motivo: `outra versão da mesma fala — a escolhida é ${melhor.nome}`, atualizado_em: new Date().toISOString() }) })
+        }
+        versoes++
+      }
+    }
+    if (versoes) console.log(`versões repetidas da mesma fala: ${versoes} viraram erro (ficou a melhor de cada)`)
+  }
   if (!AVALIAR && !cotaAcabou) {
     let unidos = 0
-    for (const [id, membros] of divNovas) {
-      const bom = (m) => ['boa', 'gancho', 'complemento'].includes(m.tipo || m.tipoNovo || m.ia_tipo) // humano > o que a IA acabou de decidir > o antigo
+    for (const [id, membros] of aFechar) {
+      const bom = ehBom
       const soltar = membros.filter((m) => m.grupo && !bom(m)).map((m) => m.id)
       if (soltar.length) await sb(`brutos?drive_id=in.(${soltar.join(',')})`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ grupo_id: null }) })
       const bons = membros.filter(bom)
@@ -569,7 +626,7 @@ if (!SO_TRANSC) {
       const r = await sb(`brutos?drive_id=in.(${bons.map((m) => m.id).join(',')})`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ grupo_id: g }) })
       if (r.ok) unidos++
     }
-    if (divNovas.size) console.log(`vídeos: ${divNovas.size} · com takes bons unidos: ${unidos}`)
+    if (aFechar.size) console.log(`vídeos revistos: ${aFechar.size} · com takes bons unidos: ${unidos}`)
   }
   console.log(`tokens gastos: ${gastos}`)
   console.log(`classificados: ${nClass}${pendentes ? ` · pendentes: ${pendentes}` : ''}${cotaAcabou ? ' · parou na cota do dia' : ''}`)
