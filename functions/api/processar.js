@@ -50,34 +50,51 @@ async function chamarGroq(env, texto, copy) {
     '- Se o documento for de um unico video, retorne UM item.\n' +
     '- Nao invente videos que nao estao no texto. Nada fora do JSON.'
 
-  const pedir = (limite) =>
+  // TEXTO INTEIRO até 28 mil caracteres (~7 mil tokens). Raciocínio BAIXO e teto de saída: com o
+  // raciocínio padrão o gpt-oss esvaziava a resposta e a Groq devolvia "json_validate_failed" — o
+  // PDF "Leva 1 - ADS Vídeo (Fora do Padrão) - MBFV" falhou 4 de 4 assim e acertou 4 de 4 (10 vídeos)
+  // com raciocínio baixo (02/10/2026). O teto respeita os 8 mil tokens/min da conta grátis, que
+  // contam o pedido inteiro (texto + saída reservada).
+  const doc = String(texto).slice(0, 28000)
+  const estPedido = Math.ceil(doc.length / 3.5) + 500
+  const teto = Math.max(1500, Math.min(4000, 7900 - estPedido))
+  const pedir = (modelo) =>
     fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.GROQ_API_KEY },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model: modelo,
         temperature: 0.2,
+        reasoning_effort: 'low',
+        max_completion_tokens: teto,
         response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: sys }, { role: 'user', content: String(texto).slice(0, limite) }],
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: doc }],
       }),
     })
+  const dormir = (ms) => new Promise((r) => setTimeout(r, ms))
 
-  let resp = await pedir(28000)
-  if (resp.status === 400) {
-    // JSON truncado: tenta de novo com menos documento — menos vídeos por resposta, saída menor
-    resp = await pedir(12000)
-  }
-  if (resp.status === 429) {
-    // O gpt-oss-120b tem teto de 8 mil tokens/min no plano gratis (o llama antigo dava
-    // 12 mil), entao documento grande passa raspando. Em vez de perder o upload inteiro,
-    // espera o pouco que a Groq pedir e refaz a leitura com metade do texto.
-    const espera = Math.min(Number(resp.headers.get('retry-after') || 2), 3)
-    await new Promise((r) => setTimeout(r, espera * 1000))
-    resp = await pedir(14000)
+  // Falha de JSON é sorteio do modelo: repete o MESMO pedido (cortar o documento só perdia vídeos).
+  // Limite por minuto: espera o que a Groq pedir. Se o 120b não der, o 20b tem cota própria.
+  let resp
+  const tentativas = [GROQ_MODEL, GROQ_MODEL, 'openai/gpt-oss-20b']
+  for (let i = 0; i < tentativas.length; i++) {
+    resp = await pedir(tentativas[i])
+    if (resp.status === 429) {
+      await dormir(Math.min(Number(resp.headers.get('retry-after') || 3), 10) * 1000)
+      resp = await pedir(tentativas[i])
+    }
+    if (resp.ok) {
+      const d = await resp.clone().json().catch(() => null)
+      const txt = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content
+      if (txt) { try { JSON.parse(txt); break } catch { /* JSON inválido apesar do 200: tenta de novo */ } }
+    }
   }
   if (!resp.ok) {
     const t = await resp.text()
-    throw new Error('Groq ' + resp.status + ': ' + t.slice(0, 300))
+    console.log('Groq ' + resp.status + ': ' + t.slice(0, 300))
+    throw new Error(resp.status === 429
+      ? 'A IA está no limite de uso por minuto. Espere 1 minuto e suba o documento de novo.'
+      : 'A IA não conseguiu ler este documento agora (' + resp.status + '). Tente de novo em instantes.')
   }
   const data = await resp.json()
   const content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '{}'
@@ -89,23 +106,34 @@ async function chamarGroq(env, texto, copy) {
   // dentro do JSON: num documento longo (VSL) a resposta estourava o limite de saída e o JSON vinha
   // cortado — "completion tokens reached before generating a valid document". Agora a IA devolve só
   // as primeiras palavras de cada vídeo e nós fatiamos o documento original entre uma marca e a outra.
-  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
-  const alvo = norm(texto)
-  const marcas = videos.map((v) => {
-    const ini = norm(v.inicio).slice(0, 90)
-    return ini.length >= 12 ? alvo.indexOf(ini) : -1
-  })
-  // mapa de posição do texto normalizado -> posição no texto original (o normalizado colapsa espaços)
+  // Comparação só por LETRAS E NÚMEROS (sem acento, pontuação nem caixa): a IA copia o começo da
+  // fala com uma vírgula ou aspas diferentes e o trecho não era achado — o roteiro daquele vídeo ia
+  // parar no card anterior. Cada letra do texto comparado aponta pra posição dela no original.
+  const base = (c) => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const plano = []
   const mapa = []
   {
-    let vazio = true
+    let espaco = true
     for (let i = 0; i < texto.length; i++) {
-      const c = texto[i]
-      const eSp = /\s/.test(c)
-      if (eSp) { if (!vazio) { mapa.push(i); vazio = true } }
-      else { mapa.push(i); vazio = false }
+      const b = base(texto[i])
+      if (/[a-z0-9]/.test(b)) { plano.push(b[0]); mapa.push(i); espaco = false }
+      else if (!espaco) { plano.push(' '); mapa.push(i); espaco = true }
     }
   }
+  const alvo = plano.join('')
+  const limpar = (t) => Array.from(String(t || '')).map(base).join('').replace(/[^a-z0-9]+/g, ' ').trim()
+  // procura com as 10 palavras; se não achar, com 7, depois 5 (a IA às vezes troca uma palavra no fim)
+  const achar = (inicio) => {
+    const pal = limpar(inicio).split(' ').filter(Boolean)
+    for (const n of [10, 7, 5]) {
+      const trecho = pal.slice(0, n).join(' ')
+      if (trecho.length < 12) continue
+      const pos = alvo.indexOf(trecho)
+      if (pos >= 0) return pos
+    }
+    return -1
+  }
+  const marcas = videos.map((v) => achar(v.inicio))
   const paraOriginal = (pos) => (pos < 0 ? -1 : mapa[Math.min(pos, mapa.length - 1)] ?? -1)
 
   return videos.map((v, i) => {
