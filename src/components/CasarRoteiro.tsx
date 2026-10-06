@@ -20,11 +20,20 @@ export default function CasarRoteiro({ onFechar, onPronto }: { onFechar: () => v
   async function lerArquivo(f: File | undefined) {
     if (!f) return
     setErro('')
-    if (!/\.(txt|md|rtf)$/i.test(f.name)) {
-      setErro('Por ora leio .txt — no Google Docs use Arquivo › Fazer download › Texto sem formatação, ou cole o texto aqui.')
+    if (/\.(txt|md|rtf)$/i.test(f.name)) { setTexto(await f.text()); return }
+    if (!/\.(docx|pdf)$/i.test(f.name)) {
+      setErro('Leio .docx, .pdf e .txt. Do Google Docs: Arquivo › Fazer download › Word (.docx).')
       return
     }
-    setTexto(await f.text())
+    // .docx e .pdf: o servidor tira o texto (mesma leitura do Subir roteiros)
+    try {
+      const r = await fetch('/api/extrair-texto?nome=' + encodeURIComponent(f.name), { method: 'POST', body: f })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok || !d.texto) throw new Error(d.error || 'não consegui ler o arquivo')
+      setTexto(d.texto)
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'não consegui ler o arquivo')
+    }
   }
 
   async function analisar() {
@@ -56,8 +65,10 @@ export default function CasarRoteiro({ onFechar, onPronto }: { onFechar: () => v
       }]).select('id')
       const cardId = data?.[0]?.id
       if (!cardId) continue
+      // liga TODAS as tomadas antes de batizar: batizando uma a uma, a numeração (2), (3) era
+      // calculada com o card ainda incompleto e duas tomadas saíam com o mesmo nome no Drive
+      for (const t of p.tomadas) await supabase.from('brutos').update({ card_id: cardId }).eq('drive_id', t.drive_id)
       for (const t of p.tomadas) {
-        await supabase.from('brutos').update({ card_id: cardId }).eq('drive_id', t.drive_id)
         await fetch('/api/bruto-batizar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drive_id: t.drive_id }) }).catch(() => {})
       }
     }
@@ -119,7 +130,7 @@ export default function CasarRoteiro({ onFechar, onPronto }: { onFechar: () => v
               <label className="faixa-toque flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-strong hover:border-brand/50 bg-surface/40 py-6 cursor-pointer transition-colors mb-3">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-2"><path d="M12 16V4M6 10l6-6 6 6M4 20h16" /></svg>
                 <span className="text-[13.5px] font-semibold">Escolher arquivo do roteiro</span>
-                <input type="file" accept=".txt,.md,.rtf" className="hidden" onChange={(e) => lerArquivo(e.target.files?.[0])} />
+                <input type="file" accept=".docx,.pdf,.txt,.md,.rtf" className="hidden" onChange={(e) => lerArquivo(e.target.files?.[0])} />
               </label>
               <textarea
                 value={texto} onChange={(e) => setTexto(e.target.value)}

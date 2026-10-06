@@ -300,6 +300,24 @@ const PAUSA_VIDEO = 300
 // assinatura vitalícia vai acabar…" três vezes). A classificação por janela deixava as três "boa" — e a
 // união juntava as três no card. Aqui a IA vê os takes bons do vídeo inteiro, agrupa as versões da
 // mesma fala e escolhe UMA por grupo; partes diferentes (abertura, corpo, chamada) ficam cada uma.
+// TRAVA DA IA: num lançamento todos os ganchos falam da mesma oferta ("última assinatura vitalícia,
+// cursos atuais e futuros"), e a IA juntava ganchos DIFERENTES como versões uma da outra — na gravação
+// de 02/10 ela rebaixou o Gancho 03, o 04 e o 10 a "versão" de um esquete de 52 s. Medido em 34 pares
+// reais: versão de verdade divide muitas palavras E tem duração parecida (ou é quase o mesmo texto,
+// como a largada falsa de uma tomada longa). Gancho de 15 s contra esquete de 52 s nunca é versão.
+const PARADAS = new Set('a o e de da do das dos que para pra com no na nos nas um uma em por se eu voce meu minha meus minhas seu sua isso esse essa este esta aqui so ja vai vou ser foi tem ter todo todos toda todas como ne ta olha bom entao nao mais muito'.split(' '))
+const palavrasFala = (t) => new Set((String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[a-z0-9]+/g) || []).filter((w) => w.length > 2 && !PARADAS.has(w)))
+function mesmaFala(a, b) {
+  const pa = palavrasFala(a.transc), pb = palavrasFala(b.transc)
+  if (!pa.size || !pb.size) return false
+  let comum = 0
+  for (const w of pa) if (pb.has(w)) comum++
+  const sobre = comum / Math.min(pa.size, pb.size)
+  const da = a.seg || 0, db = b.seg || 0
+  const razao = da && db ? Math.max(da, db) / Math.min(da, db) : 99
+  return sobre >= 0.8 || (sobre >= 0.55 && razao <= 1.8)
+}
+
 async function escolherVersoes(bons) {
   const linhas = bons.map((b, i) => `#${i + 1} · ${horaDe(b) || '?'} · ${durDe(b)}: ${falaDe(b, 260, 200)}`)
   const sys = 'Você recebe os takes marcados como BONS de um mesmo vídeo, na ordem de gravação (hora, duração, começo e fim da fala). ' +
@@ -316,7 +334,7 @@ async function escolherVersoes(bons) {
     const vs = (Array.isArray(g.versoes) ? g.versoes : []).map((n) => bons[Number(n) - 1]).filter(Boolean)
     const melhor = bons[Number(g.melhor) - 1]
     if (vs.length < 2 || !melhor || !vs.includes(melhor)) continue
-    for (const v of vs) if (v !== melhor) perdedores.set(v, melhor)
+    for (const v of vs) if (v !== melhor && mesmaFala(v, melhor)) perdedores.set(v, melhor)
   }
   return perdedores
 }

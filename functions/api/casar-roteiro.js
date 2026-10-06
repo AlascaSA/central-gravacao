@@ -52,18 +52,44 @@ poucos parágrafos nunca é uma tomada de 10, 15 ou 20 minutos, por mais que o a
 "trecho" é a primeira linha do roteiro daquela peça, pra pessoa conferir.
 Se nada casar com segurança, devolva {"pecas":[]}.`
 
-    const user = `ROTEIRO:\n${String(texto).slice(0, 7000)}\n\nTOMADAS DISPONÍVEIS:\n${resumo}`
-
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // ROTEIRO EM PARTES: antes só os primeiros 7 mil caracteres eram lidos — num documento de 20 mil
+    // (sete esquetes) só o primeiro anúncio era casado. Cada parte vai numa chamada (o teto é 8 mil
+    // tokens/min) e a tomada que já foi casada sai das partes seguintes.
+    const partes = []
+    {
+      let atual = ''
+      for (const par of String(texto).split(/\n\s*\n/)) {
+        if (atual && (atual.length + par.length) > 5500) { partes.push(atual); atual = '' }
+        atual += (atual ? '\n\n' : '') + par
+      }
+      if (atual.trim()) partes.push(atual)
+    }
+    const dormir = (ms) => new Promise((r) => setTimeout(r, ms))
+    const pedir = (roteiro) => fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.GROQ_API_KEY },
-      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }),
+      // raciocínio baixo: com o padrão o gpt-oss esvaziava a resposta ("json_validate_failed")
+      body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.2, reasoning_effort: 'low', max_completion_tokens: 1500, response_format: { type: 'json_object' },
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: `ROTEIRO:\n${roteiro.slice(0, 6000)}\n\nTOMADAS DISPONÍVEIS:\n${resumo}` }] }),
     })
-    const d = await r.json()
-    if (!r.ok) return Response.json({ error: 'IA: ' + JSON.stringify(d).slice(0, 160) }, { status: 502 })
-
-    let parsed = {}
-    try { parsed = JSON.parse(d.choices[0].message.content) } catch { return Response.json({ error: 'a IA respondeu fora do formato' }, { status: 502 }) }
+    const parsed = { pecas: [] }
+    const usadas = new Set()
+    for (const parte of partes.slice(0, 8)) {
+      let r = null, ok = null
+      for (let t = 0; t < 3 && !ok; t++) {
+        r = await pedir(parte)
+        if (r.status === 429) { await dormir(Math.min(Number(r.headers.get('retry-after') || 5), 20) * 1000); continue }
+        if (!r.ok) continue
+        const d = await r.json().catch(() => null)
+        try { ok = JSON.parse(d.choices[0].message.content) } catch { ok = null }
+      }
+      if (!ok) continue
+      for (const p of ok.pecas || []) {
+        const tomadas = (p.tomadas || []).filter((i) => !usadas.has(Number(i)))
+        tomadas.forEach((i) => usadas.add(Number(i)))
+        if (tomadas.length) parsed.pecas.push({ ...p, tomadas })
+      }
+    }
 
     const pecas = (parsed.pecas || [])
       .map((p) => ({
