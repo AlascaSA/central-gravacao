@@ -108,6 +108,20 @@ async function julgar(sistema, usuario) {
   return JSON.parse(d.choices[0].message.content)
 }
 
+async function mudo(arquivo) {
+  const dur = Number((await exec('ffprobe', ['-v', 'error', '-show_entries', 'format=duration',
+    '-of', 'csv=p=0', arquivo])).stdout.trim())
+  const r = await exec('ffmpeg', ['-hide_banner', '-nostats', '-i', arquivo, '-vn',
+    '-af', 'silencedetect=noise=-35dB:d=0.4', '-f', 'null', '-']).catch(e => e)
+  let ini = 0, fim = 0, abre = null
+  for (const [, k, v] of (r.stderr || '').matchAll(/silence_(start|end): ([\d.]+)/g)) {
+    if (k === 'start') abre = Number(v)
+    else { if (abre !== null && abre < 0.05) ini = Number(v); abre = null }
+  }
+  if (abre !== null) fim = dur - abre
+  return { ini, fim }
+}
+
 const temData = x => /4 de novembro|19 ?h|19 horas/i.test(x.texto)
 
 const REGRA = `Você monta anúncios de vídeo de um professor de Direito (Jaylton Lopes) juntando três gravações na ordem GANCHO -> CORPO -> CTA.
@@ -137,8 +151,12 @@ async function mapear() {
   console.log(`${G.length} ganchos, ${C.length} corpos, ${T.length} CTAs`)
 
   for (const x of [...G, ...C, ...T]) {
-    x.texto = await transcrever(await local(x))
+    const arq = await local(x)
+    x.texto = await transcrever(arq)
     console.log(`  ${x.cod} (${x.name}): ${x.texto.slice(0, 90)}`)
+    // peça com rabo mudo deixa o anúncio parado antes do corte (Gancho 07, 19/10)
+    const { ini, fim } = await mudo(arq)
+    if (ini > 0.8 || fim > 0.8) console.log(`  ATENÇÃO ${x.cod}: ${ini.toFixed(1)}s mudo no começo, ${fim.toFixed(1)}s no fim`)
   }
 
   // peça com fala de bastidor ou que já é um anúncio inteiro estraga todas as
