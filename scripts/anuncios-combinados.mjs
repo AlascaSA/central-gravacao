@@ -29,7 +29,7 @@ fs.mkdirSync(TRAB, { recursive: true })
 async function filhos(id) {
   const q = encodeURIComponent(`'${id}' in parents and trashed=false`)
   const d = await (await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}` +
-    `&fields=files(id,name,mimeType)&pageSize=500&orderBy=name&${COMUM}`,
+    `&fields=files(id,name,mimeType,createdTime)&pageSize=500&orderBy=name&${COMUM}`,
     { headers: { Authorization: 'Bearer ' + await token() } })).json()
   if (d.error) throw new Error(d.error.message)
   return d.files
@@ -192,7 +192,9 @@ async function montar(parte, de) {
   const saida = await pastaDeSaida(PASTA, 'Montados')
   // rodada refeita sem o mapeamento: o plano já está no Drive
   if (!fs.existsSync(PLANO)) {
-    const f = (await filhos(saida)).find(x => x.name === 'plano.json')
+    // rodadas refeitas deixam mais de um plano na pasta: vale o mais novo
+    const f = (await filhos(saida)).filter(x => x.name === 'plano.json')
+      .sort((a, b) => b.createdTime.localeCompare(a.createdTime))[0]
     if (!f) throw new Error('sem plano.json: rode o mapeamento antes')
     await baixar(f.id, PLANO)
   }
