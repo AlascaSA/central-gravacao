@@ -1,0 +1,54 @@
+name: Anúncios gancho + corpo + CTA
+
+# Junta as peças de uma pasta do Drive (Ganchos/, Corpos/, CTA`s/, _kit/) com
+# film burn, swoosh e música, e devolve tudo em Montados/. Nada roda na máquina
+# de ninguém. Refazer só a montagem (o plano já no Drive): mapear = false.
+on:
+  workflow_dispatch:
+    inputs:
+      pasta:
+        description: "id da pasta no Drive"
+        required: true
+      prefixo:
+        description: "começo do nome dos anúncios"
+        default: "2610-JL-BF-CAP"
+      mapear:
+        description: "transcrever e cruzar antes de montar"
+        type: boolean
+        default: true
+
+jobs:
+  mapear:
+    if: ${{ inputs.mapear }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+      - run: node scripts/anuncios-combinados.mjs --mapear
+        env:
+          PASTA: ${{ inputs.pasta }}
+          PREFIXO: ${{ inputs.prefixo }}
+          GROQ_KEY: ${{ secrets.GROQ_KEY }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+
+  montar:
+    needs: mapear
+    if: ${{ always() && (needs.mapear.result == 'success' || needs.mapear.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+      - run: node scripts/anuncios-combinados.mjs --montar --parte ${{ matrix.parte }} --de 20
+        env:
+          PASTA: ${{ inputs.pasta }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}

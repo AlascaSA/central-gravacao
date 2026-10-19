@@ -118,7 +118,7 @@ export async function baixar(id, destino) {
 }
 
 /** Sobe um arquivo do disco para a pasta, por sessão retomável. */
-export async function subir(caminho, pasta, nome) {
+export async function subir(caminho, pasta, nome, tipo = 'video/mp4') {
   const bytes = fs.statSync(caminho).size
   const abre = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true', {
@@ -126,17 +126,17 @@ export async function subir(caminho, pasta, nome) {
       headers: {
         Authorization: 'Bearer ' + await token(),
         'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Type': 'video/mp4',
+        'X-Upload-Content-Type': tipo,
         'X-Upload-Content-Length': String(bytes),
       },
-      body: JSON.stringify({ name: nome, parents: [pasta], mimeType: 'video/mp4' }),
+      body: JSON.stringify({ name: nome, parents: [pasta], mimeType: tipo }),
     })
   const sessao = abre.headers.get('location')
   if (!abre.ok || !sessao) throw new Error('Drive recusou a sessão: ' + (await abre.text()).slice(0, 200))
 
   const r = await fetch(sessao, {
     method: 'PUT',
-    headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(bytes) },
+    headers: { 'Content-Type': tipo, 'Content-Length': String(bytes) },
     body: fs.createReadStream(caminho),
     duplex: 'half',
   })
