@@ -150,16 +150,17 @@ Aponte só problema real: fala de bastidor dentro do take (instrução da equipe
 
   const gc = await matriz('gancho', G, 'corpo', C)
   const ct = await matriz('corpo', C, 'cta', T)
-  const gt = await matriz('gancho', G, 'cta', T)
 
-  // mesma regra do lote de agosto: os três pares precisam servir, e quanto mais F, melhor
+  // só os pares que ficam colados no vídeo decidem. O gancho × CTA (que o lote de
+  // agosto também usava) barrava colunas inteiras de CTA sem motivo; entre os
+  // dois existe o corpo, e a repetição que importa ali é a data, travada abaixo
   const ok = n => n === 'F' || n === 'S'
   const letra = i => i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(65 + Math.floor(i / 26) - 1) + String.fromCharCode(65 + i % 26)
   const combinacoes = []
   C.forEach((c, ci) => {
     const grupo = []
     for (const g of G) for (const t of T) {
-      const notas = [gc[g.cod][c.cod], ct[c.cod][t.cod], gt[g.cod][t.cod]]
+      const notas = [gc[g.cod][c.cod], ct[c.cod][t.cod]]
       // todo CTA já diz a data da live; dita nas três partes vira ladainha
       if ([g, c, t].every(temData)) continue
       if (notas.every(ok)) grupo.push({ g: g.cod, c: c.cod, t: t.cod, f: notas.filter(n => n === 'F').length })
@@ -170,7 +171,7 @@ Aponte só problema real: fala de bastidor dentro do take (instrução da equipe
   console.log(`${combinacoes.length} combinações de ${G.length * C.length * T.length} possíveis`)
 
   const so = xs => xs.map(({ id, name, cod, texto }) => ({ id, name, cod, texto }))
-  const plano = { prefixo: PREFIXO, pasta: PASTA, kit: raiz.kit.id, ganchos: so(G), corpos: so(C), ctas: so(T), gc, ct, gt, combinacoes }
+  const plano = { prefixo: PREFIXO, pasta: PASTA, kit: raiz.kit.id, ganchos: so(G), corpos: so(C), ctas: so(T), gc, ct, combinacoes }
   fs.writeFileSync(PLANO, JSON.stringify(plano, null, 1))
 
   // a tabela vai junto pro Drive: é por ela que se descobre o que tem em cada anúncio
