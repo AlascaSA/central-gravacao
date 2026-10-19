@@ -133,6 +133,20 @@ Dê F só quando a segunda peça traz algo novo que a primeira pediu.
 O tema da campanha — "a última assinatura vitalícia", "última vez", "nunca mais" — aparece em quase todas as peças de propósito: repetir esse tema NÃO é repetição e não tira nota.
 Responda só JSON no formato {"A01": {"B01": "F", "B02": "N"}, ...} cobrindo TODOS os pares pedidos.`
 
+// junta o que o plano anterior já julgou com a IA só para os pares que faltam
+async function cruzar(nomeA, as, nomeB, bs, antes) {
+  const m = {}
+  for (const a of as) { m[a.cod] = {}; for (const b of bs) { const v = antes?.[a.cod]?.[b.cod]; if (a.velha && b.velha && v) m[a.cod][b.cod] = v } }
+  const novosA = as.filter(a => !a.velha), novosB = bs.filter(b => !b.velha)
+  const pedidos = antes ? [[novosA, bs], [as.filter(a => a.velha), novosB]] : [[as, bs]]
+  for (const [xa, xb] of pedidos) {
+    if (!xa.length || !xb.length) continue
+    const r = await matriz(nomeA, xa, nomeB, xb)
+    for (const a of xa) Object.assign(m[a.cod], r[a.cod])
+  }
+  return m
+}
+
 async function matriz(nomeA, as, nomeB, bs) {
   const lista = (rot, xs) => xs.map(x => `${x.cod}: "${x.texto}"`).join('\n')
   const r = await julgar(REGRA,
@@ -150,7 +164,27 @@ async function mapear() {
   const G = await pecas(raiz.ganchos, 'G'), C = await pecas(raiz.corpos, 'C'), T = await pecas(raiz.ctas, 'T')
   console.log(`${G.length} ganchos, ${C.length} corpos, ${T.length} CTAs`)
 
+  // ACRESCENTAR: os anúncios do plano anterior ficam como estão (mesmo código,
+  // mesmo arquivo); só as peças novas são avaliadas e só as combinações com
+  // elas entram, com letras depois das que já existem
+  const antes = process.env.ACRESCENTAR === 'true' ? await planoAtual() : null
+  if (antes) {
+    const velhas = Object.fromEntries([...antes.ganchos, ...antes.corpos, ...antes.ctas].map(x => [x.id, x]))
+    for (const grupo of [G, C, T]) {
+      const usados = new Set(grupo.map(x => velhas[x.id]?.cod).filter(Boolean))
+      for (const x of grupo) {
+        if (velhas[x.id]) { x.cod = velhas[x.id].cod; x.texto = velhas[x.id].texto; x.velha = true; continue }
+        // número do arquivo já usado por outra peça: pega o próximo livre
+        let n = Number(x.cod.slice(1))
+        while (usados.has(x.cod[0] + String(n).padStart(2, '0'))) n++
+        x.cod = x.cod[0] + String(n).padStart(2, '0'); usados.add(x.cod)
+      }
+    }
+    console.log(`acrescentando: ${[...G, ...C, ...T].filter(x => !x.velha).map(x => x.name).join(', ') || 'nada novo'}`)
+  }
+
   for (const x of [...G, ...C, ...T]) {
+    if (x.velha) continue
     const arq = await local(x)
     x.texto = await transcrever(arq)
     console.log(`  ${x.cod} (${x.name}): ${x.texto.slice(0, 90)}`)
@@ -163,30 +197,38 @@ async function mapear() {
   // combinações em que entra: aponta no log antes de montar
   const revisao = await julgar(`Você revisa gravações de anúncio antes da montagem. Responda só JSON {"problemas": [{"cod": "G01", "motivo": "..."}]}.
 Aponte só problema real: fala de bastidor dentro do take (instrução da equipe, "vai", "corta", "agora o corpo"), frase cortada no começo ou no fim, gancho que já traz corpo e chamada para ação inteiros (é um anúncio completo), ou peça no lugar errado (um CTA na pasta de ganchos). Lista vazia se estiver tudo certo.`,
-    [...G, ...C, ...T].map(x => `${x.cod} (${x.name}): "${x.texto}"`).join('\n'))
+    [...G, ...C, ...T].filter(x => !x.velha).map(x => `${x.cod} (${x.name}): "${x.texto}"`).join('\n'))
   for (const p of revisao.problemas || []) console.log(`  ATENÇÃO ${p.cod}: ${p.motivo}`)
 
-  const gc = await matriz('gancho', G, 'corpo', C)
-  const ct = await matriz('corpo', C, 'cta', T)
+  // par já julgado no plano anterior não volta pra IA
+  const gc = await cruzar('gancho', G, 'corpo', C, antes?.gc)
+  const ct = await cruzar('corpo', C, 'cta', T, antes?.ct)
 
   // só os pares que ficam colados no vídeo decidem. O gancho × CTA (que o lote de
   // agosto também usava) barrava colunas inteiras de CTA sem motivo; entre os
   // dois existe o corpo, e a repetição que importa ali é a data, travada abaixo
   const ok = n => n === 'F' || n === 'S'
   const letra = i => i < 26 ? String.fromCharCode(65 + i) : String.fromCharCode(65 + Math.floor(i / 26) - 1) + String.fromCharCode(65 + i % 26)
-  const combinacoes = []
+  const combinacoes = antes ? [...antes.combinacoes] : []
+  const feitas = new Set(combinacoes.map(x => `${x.g}|${x.c}|${x.t}`))
   C.forEach((c, ci) => {
     const grupo = []
+    // o número do corpo no código vem do plano anterior quando ele já existia
+    const prefixoCorpo = combinacoes.find(x => x.c === c.cod)?.cod.match(/^AD\d+/)?.[0] ||
+      `AD${String(ci + 1).padStart(2, '0')}`
+    const jaTem = combinacoes.filter(x => x.c === c.cod).length
     for (const g of G) for (const t of T) {
+      if (feitas.has(`${g.cod}|${c.cod}|${t.cod}`)) continue
       const notas = [gc[g.cod][c.cod], ct[c.cod][t.cod]]
       // todo CTA já diz a data da live; dita nas três partes vira ladainha
       if ([g, c, t].every(temData)) continue
       if (notas.every(ok)) grupo.push({ g: g.cod, c: c.cod, t: t.cod, f: notas.filter(n => n === 'F').length })
     }
     grupo.sort((x, y) => y.f - x.f || x.g.localeCompare(y.g) || x.t.localeCompare(y.t))
-    grupo.forEach((x, i) => combinacoes.push({ cod: `AD${String(ci + 1).padStart(2, '0')}${letra(i)}`, ...x }))
+    grupo.forEach((x, i) => combinacoes.push({ cod: `${prefixoCorpo}${letra(jaTem + i)}`, ...x }))
   })
-  console.log(`${combinacoes.length} combinações de ${G.length * C.length * T.length} possíveis`)
+  console.log(`${combinacoes.length} combinações de ${G.length * C.length * T.length} possíveis` +
+    (antes ? ` (${combinacoes.length - antes.combinacoes.length} novas)` : ''))
 
   const so = xs => xs.map(({ id, name, cod, texto }) => ({ id, name, cod, texto }))
   const plano = { prefixo: PREFIXO, pasta: PASTA, kit: raiz.kit.id, ganchos: so(G), corpos: so(C), ctas: so(T), gc, ct, combinacoes }
@@ -198,9 +240,25 @@ Aponte só problema real: fala de bastidor dentro do take (instrução da equipe
   const nome = x => [...G, ...C, ...T].find(p => p.cod === x).name.replace(/\.[a-z0-9]+$/i, '')
   fs.writeFileSync(csv, '﻿anúncio;gancho;corpo;cta;pares fortes\n' + combinacoes.map(x =>
     `${PREFIXO}-${x.cod};${nome(x.g)};${nome(x.c)};${nome(x.t)};${x.f}`).join('\n'))
+  // a planilha antiga sai: a nova já traz todas as linhas
+  for (const f of (await filhos(saida)).filter(x => /^composi/i.test(x.name)))
+    await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?supportsAllDrives=true`, {
+      method: 'PATCH', body: JSON.stringify({ trashed: true }),
+      headers: { Authorization: 'Bearer ' + await token(), 'Content-Type': 'application/json' } })
   await subir(csv, saida, 'composição dos anúncios.csv', 'text/csv')
   await subir(PLANO, saida, 'plano.json', 'application/json')
   console.log('plano e tabela no Drive, pasta Montados')
+}
+
+// rodadas refeitas deixam mais de um plano na pasta: vale o mais novo
+async function planoAtual() {
+  const saida = await pastaDeSaida(PASTA, 'Montados')
+  const f = (await filhos(saida)).filter(x => x.name === 'plano.json')
+    .sort((a, b) => b.createdTime.localeCompare(a.createdTime))[0]
+  if (!f) return null
+  const destino = path.join(TRAB, 'plano-' + f.id + '.json')
+  if (!fs.existsSync(destino)) await baixar(f.id, destino)
+  return JSON.parse(fs.readFileSync(destino, 'utf8'))
 }
 
 // ---------------------------------------------------------------- montar
@@ -208,15 +266,8 @@ function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) 
 
 async function montar(parte, de) {
   const saida = await pastaDeSaida(PASTA, 'Montados')
-  // rodada refeita sem o mapeamento: o plano já está no Drive
-  if (!fs.existsSync(PLANO)) {
-    // rodadas refeitas deixam mais de um plano na pasta: vale o mais novo
-    const f = (await filhos(saida)).filter(x => x.name === 'plano.json')
-      .sort((a, b) => b.createdTime.localeCompare(a.createdTime))[0]
-    if (!f) throw new Error('sem plano.json: rode o mapeamento antes')
-    await baixar(f.id, PLANO)
-  }
-  const plano = JSON.parse(fs.readFileSync(PLANO, 'utf8'))
+  const plano = await planoAtual()
+  if (!plano) throw new Error('sem plano.json: rode o mapeamento antes')
   const prontos = new Set((await filhos(saida)).map(f => f.name))
   const minhas = plano.combinacoes.filter((_, i) => i % de === parte)
     .filter(x => !prontos.has(`${plano.prefixo}-${x.cod}.mp4`))

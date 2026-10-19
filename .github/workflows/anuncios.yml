@@ -16,6 +16,10 @@ on:
         description: "transcrever e cruzar antes de montar"
         type: boolean
         default: true
+      acrescentar:
+        description: "manter os anúncios já feitos e montar só os das peças novas"
+        type: boolean
+        default: false
 
 jobs:
   mapear:
@@ -31,6 +35,7 @@ jobs:
         env:
           PASTA: ${{ inputs.pasta }}
           PREFIXO: ${{ inputs.prefixo }}
+          ACRESCENTAR: ${{ inputs.acrescentar }}
           GROQ_KEY: ${{ secrets.GROQ_KEY }}
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
 
