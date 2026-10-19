@@ -108,9 +108,14 @@ async function julgar(sistema, usuario) {
   return JSON.parse(d.choices[0].message.content)
 }
 
+const temData = x => /4 de novembro|19 ?h|19 horas/i.test(x.texto)
+
 const REGRA = `Você monta anúncios de vídeo de um professor de Direito (Jaylton Lopes) juntando três gravações na ordem GANCHO -> CORPO -> CTA.
 Avalie se duas peças podem ficar em sequência num mesmo anúncio sem contradição, sem repetir o mesmo argumento e sem promessa que a outra não sustenta.
 Notas: F = combina muito bem (a segunda continua naturalmente a primeira); S = serve (funciona, sem atrito); N = não serve (contradiz, repete, muda de assunto ou de oferta).
+Seja exigente: todas as peças falam da mesma oferta, então "é o mesmo assunto" NÃO basta para F ou S.
+Dê N quando as duas peças repetem o mesmo dado ou argumento específico: o mesmo valor (ex.: "mais de R$19.000"), a mesma frase de oferta ("uma única matrícula por um valor irrisório", "acesso para sempre"), a mesma lista de cursos, o mesmo bônus dos primeiros inscritos. A data da live (4 de novembro, 19h) repetida no CTA é normal: não conte como repetição.
+Dê F só quando a segunda peça traz algo novo que a primeira pediu.
 Responda só JSON no formato {"A01": {"B01": "F", "B02": "N"}, ...} cobrindo TODOS os pares pedidos.`
 
 async function matriz(nomeA, as, nomeB, bs) {
@@ -135,6 +140,13 @@ async function mapear() {
     console.log(`  ${x.cod} (${x.name}): ${x.texto.slice(0, 90)}`)
   }
 
+  // peça com fala de bastidor ou que já é um anúncio inteiro estraga todas as
+  // combinações em que entra: aponta no log antes de montar
+  const revisao = await julgar(`Você revisa gravações de anúncio antes da montagem. Responda só JSON {"problemas": [{"cod": "G01", "motivo": "..."}]}.
+Aponte só problema real: fala de bastidor dentro do take (instrução da equipe, "vai", "corta", "agora o corpo"), frase cortada no começo ou no fim, gancho que já traz corpo e chamada para ação inteiros (é um anúncio completo), ou peça no lugar errado (um CTA na pasta de ganchos). Lista vazia se estiver tudo certo.`,
+    [...G, ...C, ...T].map(x => `${x.cod} (${x.name}): "${x.texto}"`).join('\n'))
+  for (const p of revisao.problemas || []) console.log(`  ATENÇÃO ${p.cod}: ${p.motivo}`)
+
   const gc = await matriz('gancho', G, 'corpo', C)
   const ct = await matriz('corpo', C, 'cta', T)
   const gt = await matriz('gancho', G, 'cta', T)
@@ -147,6 +159,8 @@ async function mapear() {
     const grupo = []
     for (const g of G) for (const t of T) {
       const notas = [gc[g.cod][c.cod], ct[c.cod][t.cod], gt[g.cod][t.cod]]
+      // todo CTA já diz a data da live; dita nas três partes vira ladainha
+      if ([g, c, t].every(temData)) continue
       if (notas.every(ok)) grupo.push({ g: g.cod, c: c.cod, t: t.cod, f: notas.filter(n => n === 'F').length })
     }
     grupo.sort((x, y) => y.f - x.f || x.g.localeCompare(y.g) || x.t.localeCompare(y.t))
