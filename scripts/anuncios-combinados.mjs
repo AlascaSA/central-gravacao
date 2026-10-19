@@ -116,6 +116,7 @@ Notas: F = combina muito bem (a segunda continua naturalmente a primeira); S = s
 Seja exigente: todas as peças falam da mesma oferta, então "é o mesmo assunto" NÃO basta para F ou S.
 Dê N quando as duas peças repetem o mesmo dado ou argumento específico: o mesmo valor (ex.: "mais de R$19.000"), a mesma frase de oferta ("uma única matrícula por um valor irrisório", "acesso para sempre"), a mesma lista de cursos, o mesmo bônus dos primeiros inscritos. A data da live (4 de novembro, 19h) repetida no CTA é normal: não conte como repetição.
 Dê F só quando a segunda peça traz algo novo que a primeira pediu.
+O tema da campanha — "a última assinatura vitalícia", "última vez", "nunca mais" — aparece em quase todas as peças de propósito: repetir esse tema NÃO é repetição e não tira nota.
 Responda só JSON no formato {"A01": {"B01": "F", "B02": "N"}, ...} cobrindo TODOS os pares pedidos.`
 
 async function matriz(nomeA, as, nomeB, bs) {
