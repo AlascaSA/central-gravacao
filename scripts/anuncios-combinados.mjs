@@ -295,7 +295,11 @@ async function montar(parte, de) {
         { largura: 1080, altura: 1920 }, { hardware: process.platform === 'darwin' })
       await porMusica(v, musicas[h % musicas.length], fim,
         { efeitos: cortes.map(t => ({ t, arquivo: swoosh, pico: 0.45 })) })
-      await subir(fim, saida, nome)
+      // o Drive devolve 502 de vez em quando no envio de arquivo grande: tenta de novo
+      for (let k = 1; ; k++) {
+        try { await subir(fim, saida, nome); break }
+        catch (e) { if (k >= 4) throw e; await new Promise(r => setTimeout(r, 5000 * k)) }
+      }
       console.log(`  ${x.cod}  ${x.g}+${x.c}+${x.t}  ${Math.round(total)}s`)
     } catch (e) {
       falhas++
