@@ -28,7 +28,18 @@ jobs:
           node-version: 22
 
       - name: Garantir ffmpeg
-        run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+        # o apt do runner às vezes trava (26/10 ficou 30 min parado aqui): baixa o ffmpeg pronto
+        # e só cai no apt se o download falhar; o passo inteiro tem teto de 5 min
+        timeout-minutes: 5
+        run: |
+          ffmpeg -version >/dev/null 2>&1 && exit 0
+          if curl -fsSL --max-time 120 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ff.tar.xz; then
+            mkdir -p /tmp/ff && tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
+            sudo install -m 755 /tmp/ff/ffmpeg /tmp/ff/ffprobe /usr/local/bin/
+          else
+            sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -1
 
       - name: Instalar dependências
         run: npm install --no-audit --no-fund
