@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { listarVideos } from './lib/scan.mjs'
+import { listarVideos, BRUTOS_ROOTS } from './lib/scan.mjs'
 
 const SUPA = 'https://kkvuioyferqbilfwdkqa.supabase.co'
 const SECRET = process.env.SUPA_SECRET
@@ -86,7 +86,17 @@ async function upsert(v, capa) {
 const iP = process.argv.indexOf('--pasta')
 const pastaArg = iP >= 0 ? process.argv[iP + 1] : null
 const pastaId = pastaArg ? ((pastaArg.match(/folders\/([\w-]+)/) || [])[1] || (pastaArg.match(/[\w-]{20,}/) || [])[0] || pastaArg) : null
-const raizes = pastaId ? [pastaId] : undefined
+// varredura completa = as pastas DO TIME. Antes caía nas pastas "Brutos" antigas do Jaylton, que não
+// têm mais as gravações (elas foram para "Jaylton Lopes › 08. Vídeos brutos"): em 26/10 uma rodada sem
+// link achou 217 vídeos e a limpeza apagou 443 linhas do catálogo. Time sem pasta aqui não varre tudo.
+const RAIZES_DO_TIME = {
+  jaylton: ['1PF8r2Wvi7VYyqagwfgaJdd2MmVwEpPq4', ...BRUTOS_ROOTS], // 08. Vídeos brutos + as antigas
+}
+if (!pastaId && !RAIZES_DO_TIME[TEAM]) {
+  console.log(`o time "${TEAM}" não tem pasta de brutos configurada: processe colando o link da pasta`)
+  process.exit(0)
+}
+const raizes = pastaId ? [pastaId] : RAIZES_DO_TIME[TEAM]
 
 const token = await driveToken()
 const videos = await listarVideos(token, raizes)
@@ -109,14 +119,18 @@ for (const v of videos) {
 }
 // limpeza: só em varredura completa (sem --pasta). Remove do catálogo os que sumiram do Drive
 // e NÃO estão ligados a um card (esses ficam pra não quebrar o vínculo).
-if (!raizes) {
+if (!pastaId) {
   try {
     // ESCOPADO POR TIME: só lê e só apaga brutos do TEAM atual. Sem isso, uma varredura do jaylton
     // (raízes fixas do jaylton) apagaria brutos de outros times, que nunca entram no `scanned`.
     const emBanco = await (await sb(`brutos?select=drive_id,card_id&team=eq.${encodeURIComponent(TEAM)}`)).json()
     const scanned = new Set(videos.map((v) => v.id))
     const removidos = (Array.isArray(emBanco) ? emBanco : []).filter((b) => !scanned.has(b.drive_id) && !b.card_id).map((b) => b.drive_id)
-    if (removidos.length) {
+    // trava: sumiço grande é varredura errada (pasta movida, permissão), não vídeo apagado
+    const limite = Math.max(20, Math.ceil((Array.isArray(emBanco) ? emBanco.length : 0) * 0.05))
+    if (removidos.length > limite) {
+      console.log(`limpeza SUSPENSA: removeria ${removidos.length} do catálogo (limite ${limite}). Confira as pastas do time.`)
+    } else if (removidos.length) {
       const lista = removidos.map((id) => `"${id}"`).join(',')
       const r = await sb(`brutos?team=eq.${encodeURIComponent(TEAM)}&drive_id=in.(${lista})`, { method: 'DELETE' })
       console.log(`removidos do catálogo: ${removidos.length} (${r.ok ? 'ok' : 'falhou ' + r.status})`)
